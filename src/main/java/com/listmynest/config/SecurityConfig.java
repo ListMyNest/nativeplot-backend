@@ -43,6 +43,7 @@ public class SecurityConfig {
                         .requestMatchers("/v3/api-docs/**").permitAll()
 
                         .requestMatchers(HttpMethod.POST, "/v1/admin/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/v1/admin/auth/register").permitAll()
 
                         .requestMatchers("/v1/saved/**").hasRole("BUYER")
                         .requestMatchers("/v1/sellers/**").hasRole("SELLER")

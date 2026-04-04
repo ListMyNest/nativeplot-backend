@@ -55,3 +55,5 @@ cors:
 
 app:
   base-url: ${APP_BASE_URL:http://localhost:8080}
+  # If set, additional admin accounts (when one already exists) require this value in inviteSecret.
+  admin-invite-secret: ${ADMIN_INVITE_SECRET:}

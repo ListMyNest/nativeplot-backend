@@ -4,6 +4,7 @@ import com.listmynest.config.JwtService;
 import com.listmynest.dto.AdminAgentDTO;
 import com.listmynest.dto.AdminBuyerDTO;
 import com.listmynest.dto.AdminLoginRequest;
+import com.listmynest.dto.AdminRegisterRequest;
 import com.listmynest.dto.AdminPropertyDTO;
 import com.listmynest.dto.AdminSellerDTO;
 import com.listmynest.dto.AuditLogDTO;
@@ -34,6 +35,7 @@ import com.listmynest.repository.VisitRepository;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -60,6 +62,9 @@ import java.util.UUID;
 public class AdminService {
 
     private static final DateTimeFormatter ISO_INSTANT = DateTimeFormatter.ISO_INSTANT;
+
+    @Value("${app.admin-invite-secret:}")
+    private String adminInviteSecret;
 
     private static List<String> parseAssignedCitiesCsv(String csv) {
         if (csv == null || csv.isBlank()) {
@@ -301,6 +306,39 @@ public class AdminService {
         );
         List<AuditLogDTO> content = p.getContent().stream().map(this::toAuditLogDto).toList();
         return new PageResponse<>(content, p.getNumber(), p.getSize(), p.getTotalElements());
+    }
+
+    @Transactional
+    public AuthResponse registerAdmin(AdminRegisterRequest req) {
+        String email = req.email().trim().toLowerCase();
+        if (adminRepository.findByEmail(email).isPresent()) {
+            throw new AppException(409, "EMAIL_ALREADY_REGISTERED");
+        }
+        long count = adminRepository.count();
+        if (count > 0) {
+            if (!StringUtils.hasText(adminInviteSecret)) {
+                throw new AppException(403, "ADMIN_REGISTRATION_DISABLED");
+            }
+            if (!StringUtils.hasText(req.inviteSecret())
+                    || !adminInviteSecret.equals(req.inviteSecret().trim())) {
+                throw new AppException(403, "INVALID_INVITE_SECRET");
+            }
+        }
+
+        String phone = req.phone() != null ? req.phone().trim() : null;
+        if (phone != null && phone.isEmpty()) {
+            phone = null;
+        }
+        Admin admin = Admin.builder()
+                .name(req.name().trim())
+                .email(email)
+                .phone(phone)
+                .passwordHash(passwordEncoder.encode(req.password()))
+                .build();
+        adminRepository.save(admin);
+
+        String token = jwtService.generateToken(admin.getId(), "ADMIN", Map.of());
+        return new AuthResponse(token, "ADMIN", admin.getId(), admin.getName());
     }
 
     @Transactional(readOnly = true)

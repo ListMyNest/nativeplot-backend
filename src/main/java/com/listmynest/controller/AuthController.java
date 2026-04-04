@@ -1,6 +1,6 @@
 package com.listmynest.controller;
 
-import com.listmynest.dto.ApiResponse;
+import com.listmynest.dto.OtpSendResponse;
 import com.listmynest.dto.AuthResponse;
 import com.listmynest.dto.OtpSendRequest;
 import com.listmynest.dto.OtpVerifyRequest;
@@ -24,9 +24,9 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/otp/send")
-    public ApiResponse sendOtp(@Valid @RequestBody OtpSendRequest request) {
-        authService.sendOtp(request.phone());
-        return new ApiResponse(true, "OTP sent");
+    public OtpSendResponse sendOtp(@Valid @RequestBody OtpSendRequest request) {
+        String devOtp = authService.sendOtp(request.phone());
+        return new OtpSendResponse(true, "OTP sent", devOtp);
     }
 
     @PostMapping("/otp/verify")

@@ -3,6 +3,7 @@ package com.listmynest.controller;
 import com.listmynest.dto.AdminAgentDTO;
 import com.listmynest.dto.AdminBuyerDTO;
 import com.listmynest.dto.AdminLoginRequest;
+import com.listmynest.dto.AdminRegisterRequest;
 import com.listmynest.dto.AdminPropertyDTO;
 import com.listmynest.dto.AdminSellerDTO;
 import com.listmynest.dto.AuditLogDTO;
@@ -40,6 +41,11 @@ public class AdminController {
     @PostMapping("/auth/login")
     public AuthResponse login(@Valid @RequestBody AdminLoginRequest request) {
         return adminService.adminLogin(request);
+    }
+
+    @PostMapping("/auth/register")
+    public AuthResponse register(@Valid @RequestBody AdminRegisterRequest request) {
+        return adminService.registerAdmin(request);
     }
 
     @GetMapping("/properties")

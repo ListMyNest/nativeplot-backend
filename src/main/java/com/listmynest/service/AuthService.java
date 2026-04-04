@@ -40,7 +40,10 @@ public class AuthService {
     @Value("${msg91.otp-length:6}")
     private int msg91OtpLength;
 
-    public void sendOtp(String phone) {
+    /**
+     * @return OTP plaintext in dev mode (MSG91 disabled) for UI/testing; otherwise {@code null}
+     */
+    public String sendOtp(String phone) {
         String countKey = "otp_send_count:" + phone;
         String otpKey = "otp:" + phone;
 
@@ -85,12 +88,13 @@ public class AuthService {
         if (devMode) {
             log.warn("MSG91_AUTH_KEY is blank — skipping SMS send (dev mode)");
             log.info("DEV MODE OTP for {}: {}", phone, otp);
-            return;
+            return otp;
         }
 
         if (!msg91Service.sendSms(phone, "Your ListMyNest OTP is " + otp)) {
             throw new AppException(503, "SMS_SEND_FAILED");
         }
+        return null;
     }
 
     public AuthResponse verifyOtp(String phone, String otp) {
