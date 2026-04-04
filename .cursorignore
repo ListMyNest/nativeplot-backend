@@ -1,0 +1,36 @@
+# ListMyNest Backend — Cursor Ignore
+
+# Build outputs
+build/
+.gradle/
+out/
+
+# Environment / secrets
+.env
+.env.local
+.env.production
+*.env
+
+# Gradle wrapper (large binaries)
+gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test output
+test-results/
+reports/

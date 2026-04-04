@@ -1,0 +1,40 @@
+# ListMyNest Backend — Git Ignore
+
+# Environment / secrets — NEVER commit
+.env
+.env.local
+.env.production
+*.env
+
+# Build outputs
+build/
+out/
+*.jar
+*.war
+*.class
+
+# Gradle
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+*.swp
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test output
+test-results/
+reports/

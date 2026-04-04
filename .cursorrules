@@ -1,0 +1,93 @@
+# ListMyNest — Backend Cursor Rules
+# Always read README.md, PRD.md, TRD.md before starting any task.
+# Reference them with @README.md @PRD.md @TRD.md in every new chat session.
+
+## Project
+You are building the ListMyNest Spring Boot backend — a REST API for a
+mobile-first real estate discovery platform targeting Tier-3 Indian cities.
+
+## Tech Stack
+- Java 17, Spring Boot 3.2.3, Gradle
+- Spring Data JPA + Hibernate (PostgreSQL via Supabase)
+- Spring Security 6 + JWT (stateless, no sessions)
+- Redis via Upstash (OTP hashes, rate limiting, view count buffer, cache)
+- Flyway (database migrations — V1 through V11)
+- MSG91 (OTP/SMS delivery, Sender ID: LSTNEST)
+- Wati.io (WhatsApp inbound webhook + outbound templates)
+- Firebase Admin SDK (FCM push notifications to agents)
+- Google Maps Geocoding API (address → lat/lng on property creation)
+
+## Package Structure
+com.listmynest/
+  controller/   → thin REST controllers, no business logic
+  service/      → all business logic lives here
+  repository/   → Spring Data JPA interfaces only
+  model/        → JPA @Entity classes (UUID PKs, UTC timestamps, DB-level enums)
+  dto/          → Java records for request/response (never expose entity directly)
+  config/       → SecurityConfig, CorsConfig, RedisConfig, OpenApiConfig
+  exception/    → GlobalExceptionHandler, AppException
+  scheduler/    → @Scheduled jobs (PropertyLifecycle, ViewCountFlush, VisitReminder)
+
+## Architecture Rules (NON-NEGOTIABLE)
+1. Controllers must be THIN — validate input, call one service method, return DTO
+2. GET /properties and GET /properties/{id} response DTOs must NEVER include
+   seller_phone or agent_phone — use PublicPropertyDTO record that excludes them
+3. Only GET /whatsapp/link/{propertyId} may return agent WA number —
+   and ONLY after logging the lead via LeadService first
+4. Call Now button dials agent phone, never seller phone
+5. All admin actions must call AdminAuditService.log() — no exceptions
+6. OTP hashes stored in Redis ONLY (never PostgreSQL)
+7. Backend never handles file bytes — always use Supabase signed URLs
+8. Flyway migration files: V{n}__{description}.sql — NEVER edit after creation
+
+## Security Rules
+- Buyers (anonymous): permit all GET /properties/**, POST /leads, POST /visits
+- Buyer token (soft OTP): scope limited to /saved and /notify-me endpoints only
+- Seller JWT: own listings CRUD only (validate ownership in service layer)
+- Agent JWT: assigned leads/visits only (validate assignment in service layer)
+- Admin JWT: all /admin/** + impersonation (8h expiry)
+- Wati webhook: authenticated via X-Wati-Secret header only, NOT JWT
+- Rate limits enforced in Redis before any OTP send (max 3/phone/hour)
+
+## Redis Key Conventions
+otp:{phone}                    TTL 300s   — seller/agent OTP hash
+buyer_otp:{phone}              TTL 300s   — buyer soft OTP hash
+otp_send_count:{phone}         TTL 3600s  — OTP send rate limit counter
+prop_inactive_warn:{id}        TTL 1296000s — 30→45 day lifecycle flag
+view_count:{property_id}       TTL 60s    — view count buffer (batch flush)
+wa_rl:{session}:{prop_id}      TTL 3600s  — WhatsApp click rate limit
+call_rl:{session}:{prop_id}    TTL 3600s  — Call click rate limit
+visit_rl:{session}             TTL 86400s — Visit request rate limit
+
+## Component Build Order (follow strictly — never skip ahead)
+Phase A: DB migrations → Entity models → Repositories → Redis config → Security config
+Phase B: AuthService + AuthController (seller/agent OTP + JWT)
+         BuyerAuthService + BuyerAuthController (buyer soft OTP)
+Phase C: PropertyService + PropertyController (CRUD, view count)
+         AgentRoutingService (round-robin assignment)
+         StorageService (Supabase signed URLs)
+         GpsValidationService (Haversine check, soft flag >500m)
+Phase D: LeadService + LeadController
+         WhatsAppService (Wati webhook handler + template sender)
+         VisitService + VisitController
+         NotifyMeService + NotifyMeController
+Phase E: SavedListingService + SavedListingController
+Phase F: AdminService + AdminController
+         AdminImpersonationController
+         AdminAuditService
+Phase G: PropertyLifecycleScheduler (daily 8AM)
+         ViewCountFlushScheduler (every 60s)
+         VisitReminderScheduler (FCM 1hr before visit)
+
+## DTO Rules
+- All response DTOs must be Java records
+- PublicPropertyDTO: NEVER include seller_phone, agent_phone, seller_id
+- Request DTOs: use Bean Validation annotations (@NotNull, @Size, @Pattern)
+- Page responses: wrap in a PageResponse<T> record with { content, page, size, total }
+
+## Testing Requirements
+- JUnit 5 + Mockito for all service layer tests (target 80%+ coverage)
+- @MockitoBean for Spring context tests
+- Every scheduler must have boundary-condition unit tests
+- GpsValidationService: test at exactly 500m, 499m, 501m boundaries
+- PropertyLifecycleScheduler: test 29-day (no action), 30-day (warn), 45-day (inactive)
