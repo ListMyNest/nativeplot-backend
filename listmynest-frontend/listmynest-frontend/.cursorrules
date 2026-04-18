@@ -1,0 +1,75 @@
+# ListMyNest — Frontend Cursor Rules
+# Always read README.md, PRD.md, TRD.md before starting any task.
+# Reference them with @README.md @PRD.md @TRD.md in every new chat session.
+
+## Project
+You are building ListMyNest — a mobile-first real estate discovery PWA for Tier-3 Indian cities
+(Bidar, Humnabad, Basavakalyan, Bhalki, Aurad, Karnataka).
+
+## Tech Stack
+- Next.js 14.2.3 (App Router) + TypeScript + Tailwind CSS
+- Zustand 4.5.2 (state management)
+- TanStack React Query 5.32.0 (data fetching)
+- next-pwa (PWA / service worker)
+- PostHog for analytics (posthog-js 1.121.0)
+- Google Maps JS API (Places + Geocoding)
+
+## Folder Conventions
+- app/           → Next.js App Router pages (SSR/SSG/CSR per page rules below)
+- components/    → Reusable UI components, grouped by domain (property/, buyer/, seller/, etc.)
+- store/         → Zustand stores only
+- hooks/         → Custom React hooks only
+- lib/api/       → All API call functions (never fetch inline in components)
+- lib/utils/     → Pure utility functions
+- types/         → TypeScript interfaces and enums
+
+## Rendering Rules (NON-NEGOTIABLE)
+- /property/[id]     → SSR always (SEO critical, use generateMetadata)
+- /listings          → SSR (city/type filters need server-side rendering)
+- / (homepage)       → SSG with revalidate: 300
+- /saved             → CSR only (requires buyer token)
+- /seller/**         → CSR (authenticated, no SEO needed)
+- /agent/**          → CSR (authenticated, no SEO needed)
+- /admin/**          → CSR (authenticated, no SEO needed)
+
+## Security Rules (NEVER violate these)
+1. NEVER render seller_phone or agent_phone anywhere in the frontend
+2. buyer_token → ONLY sessionStorage, never localStorage or cookies
+3. Before ANY contact action (Call Now / WhatsApp), POST /leads first — then complete the action
+4. Only fetch agent WA number from /whatsapp/link/{propertyId} — never from property detail response
+5. PostHog must use persistence: 'memory' (DPDP Act compliance — no localStorage tracking)
+6. Session hash = SHA-256(userAgent + date + screenSize) — no PII ever
+
+## Camera / Photo Rules
+- Photo upload inputs must always have: accept="image/*" capture="environment"
+- GPS EXIF extracted client-side via exifr for preview only; backend always re-validates
+
+## State Management Rules
+- buyerStore: { buyerToken, buyerId } — hydrate from sessionStorage on init
+- sessionStore: { viewedPropertyIds, contactActionTaken, notifyMeShown } — sessionStorage only
+- filterStore: { city, propertyType, priceMin, priceMax } — no persistence needed
+
+## 4-Moment Contact Capture (Business Critical)
+Implement in useContactCapture() hook:
+1. WhatsApp tap → POST /leads (type=WHATSAPP) → fetch /whatsapp/link/{id} → open wa.me link
+2. Schedule Visit → phone required on form (buyer_phone NOT NULL)
+3. Post-Visit WA → triggered by backend on agent marking VISITED
+4. Notify Me sheet → show when viewCount >= 3 AND !contactActionTaken AND !notifyMeShown
+
+## Component Style Rules
+- Mobile-first: design at 360px width first, then scale up
+- Tailwind only — no inline styles except dynamic values (e.g. width percentages)
+- Price always displayed as ₹X Lakh range, never exact amount
+- Property cards NEVER show seller/agent contact info
+- All API calls via lib/api/ functions, never raw fetch in components
+
+## API Base URL
+process.env.NEXT_PUBLIC_API_BASE_URL (never hardcode)
+
+## Testing
+- Playwright for E2E: 5 critical flows must pass before any PR merge
+  1. browse → WhatsApp click (lead logged before WA opens)
+  2. browse → schedule visit
+  3. save with OTP flow
+  4. notify-me bottom sheet trigger
+  5. saved tab display

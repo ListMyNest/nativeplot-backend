@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ListMyNest — brand tokens (PRD) */
+:root {
+  --lmn-primary: #e63946;
+  --lmn-dark: #1a1a2e;
+  --lmn-muted: #6b7280;
+  --lmn-card: #f8f9fa;
+  --lmn-verified: #2d6a4f;
+  --lmn-whatsapp: #25d366;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: #ffffff;
+  color: #1a1a2e;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+
+:focus-visible {
+  outline: 2px solid #e63946;
+  outline-offset: 2px;
+}

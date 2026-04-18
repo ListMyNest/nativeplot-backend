@@ -1,0 +1,43 @@
+# ListMyNest Backend — Git Ignore
+
+# Environment / secrets — NEVER commit
+.env
+.env.local
+.env.production
+*.env
+
+# Local app config override (keep example committed)
+src/main/resources/application.yml
+
+# Build outputs
+build/
+out/
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+*.war
+*.class
+
+# Gradle (wrapper JAR must stay committed so `./gradlew` works on a fresh clone)
+.gradle/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+*.swp
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test output
+test-results/
+reports/

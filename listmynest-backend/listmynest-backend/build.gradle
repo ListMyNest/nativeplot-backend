@@ -1,0 +1,143 @@
+// ListMyNest — Gradle Build File
+// Java 17 + Spring Boot 3.2.3
+
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.3'
+    id 'io.spring.dependency-management' version '1.1.4'
+}
+
+group = 'com.listmynest'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    sourceCompatibility = '17'
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    developmentOnly
+    compileClasspath.extendsFrom(developmentOnly)
+    runtimeClasspath.extendsFrom(developmentOnly)
+}
+
+dependencies {
+    // commons-compress (via embedded-postgres) needs commons-lang3 ≥ 3.14 for SystemProperties.getUserName
+    implementation 'org.apache.commons:commons-lang3:3.17.0'
+
+    // Spring Boot Core
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // PostgreSQL
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // Flyway (DB migrations)
+    implementation 'org.flywaydb:flyway-core'
+
+    // JWT
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.3'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
+
+    // Firebase Admin SDK (FCM push notifications)
+    implementation 'com.google.firebase:firebase-admin:9.2.0'
+
+    // Lettuce Redis client (included via spring-boot-starter-data-redis)
+    // Upstash uses rediss:// (TLS) — Lettuce handles this automatically
+
+    // OpenAPI / Swagger UI
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
+
+    // HTTP client (for MSG91 + Wati API calls)
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    // JSON
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+
+    // Local bootRun only (excluded from bootJar) — real Postgres without Docker/Supabase
+    developmentOnly 'io.zonky.test:embedded-postgres:2.2.2'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+// Parse KEY=VALUE lines (same rules as before) into a map — used for bootRun env + diagnostics.
+static Map<String, String> parseDotEnvFile(File envFile) {
+    Map<String, String> out = new LinkedHashMap<>()
+    if (!envFile.exists()) {
+        return out
+    }
+    envFile.eachLine { String raw ->
+        String line = raw.trim()
+        if (line.isEmpty() || line.startsWith('#')) {
+            return
+        }
+        int eq = line.indexOf('=')
+        if (eq <= 0) {
+            return
+        }
+        String key = line.substring(0, eq).trim()
+        if (!key.matches('[A-Za-z_][A-Za-z0-9_]*')) {
+            return
+        }
+        String value = line.substring(eq + 1).trim()
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+            value = value.substring(1, value.length() - 1)
+        }
+        out[key] = value
+    }
+    return out
+}
+
+tasks.named('bootRun', org.springframework.boot.gradle.tasks.run.BootRun) { bootRun ->
+    File repoDotEnv = file("${rootDir}/../../.env")
+    File moduleDotEnv = file("${rootDir}/.env")
+    Map<String, String> merged = new LinkedHashMap<>()
+    merged.putAll(parseDotEnvFile(repoDotEnv))
+    merged.putAll(parseDotEnvFile(moduleDotEnv))
+    merged.forEach { k, v -> bootRun.environment k, v }
+
+    bootRun.doFirst {
+        logger.lifecycle("")
+        logger.lifecycle("[ListMyNest bootRun] Dotenv files (module overrides repo on duplicate keys):")
+        logger.lifecycle("  repo:   ${repoDotEnv.absolutePath}  exists=${repoDotEnv.exists()}")
+        logger.lifecycle("  module: ${moduleDotEnv.absolutePath}  exists=${moduleDotEnv.exists()}")
+        String url = merged.get('SPRING_DATASOURCE_URL')
+        String user = merged.get('SPRING_DATASOURCE_USERNAME')
+        String pass = merged.get('SPRING_DATASOURCE_PASSWORD')
+        logger.lifecycle("  merged entries: ${merged.size()}")
+        logger.lifecycle("  SPRING_DATASOURCE_URL set:      ${url != null && url.trim() ? 'yes' : 'no'}")
+        logger.lifecycle("  SPRING_DATASOURCE_USERNAME set: ${user != null && user.trim() ? 'yes' : 'no'}")
+        logger.lifecycle("  SPRING_DATASOURCE_PASSWORD set: ${pass != null && pass.trim() ? 'yes' : 'NO (empty) — Supabase/SCRAM will fail'}")
+        if (pass == null || !pass.trim()) {
+            logger.lifecycle("  Fix: set SPRING_DATASOURCE_PASSWORD in ListMyNest/.env (see .env.example). No spaces around '='.")
+        }
+        logger.lifecycle("")
+    }
+
+    // Local Postgres + Redis via docker-compose.yml; override any datasource/redis with .env for remote.
+    bootRun.systemProperty 'spring.profiles.active', 'local'
+    bootRun.jvmArgs(
+            '-Djava.net.useSystemProxies=false',
+            '-DsocksNonProxyHosts=localhost|127.*|[::1]',
+            '-Dhttp.nonProxyHosts=localhost|127.*|[::1]'
+    )
+}

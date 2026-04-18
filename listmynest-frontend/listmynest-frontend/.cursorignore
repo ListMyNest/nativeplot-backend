@@ -1,0 +1,35 @@
+# ListMyNest Frontend — Cursor Ignore
+# Files Cursor should NOT index or use as context
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+out/
+dist/
+
+# Environment files (never read secrets into context)
+.env.local
+.env.production
+.env*.local
+
+# Generated / cache
+.turbo/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

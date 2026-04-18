@@ -1,0 +1,23 @@
+# Profile "local" (default for ./gradlew bootRun).
+# Persistence: embedded Postgres is OFF by default so listings/admins survive restarts (use Docker Postgres,
+# or set SPRING_DATASOURCE_URL / USERNAME / PASSWORD to Supabase).
+# Ephemeral in-memory DB (old behaviour): LISTMYNEST_EMBEDDED_POSTGRES=true
+# - Redis: docker compose up -d (redis on 6379). View counts / rate limits degrade gracefully if Redis is down.
+# If port 8080 is busy: SERVER_PORT=8081 (match frontend API base URL).
+server:
+  port: ${SERVER_PORT:8080}
+
+listmynest:
+  embedded:
+    enabled: true
+    postgres: ${LISTMYNEST_EMBEDDED_POSTGRES:false}
+    # 0 = let embedded Postgres pick a free port (recommended; avoids "address already in use" on 5433).
+    postgres-port: 0
+
+spring:
+  datasource:
+    # Same placeholders as application.yml so SPRING_DATASOURCE_* env vars are not clobbered by this file.
+    # When embedded Postgres starts, LocalEmbeddedServicesInitializer prepends a higher-priority JDBC URL.
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:5432/postgres}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}

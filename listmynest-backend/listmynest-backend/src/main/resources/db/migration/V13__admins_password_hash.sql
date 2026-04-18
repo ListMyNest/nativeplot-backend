@@ -1,0 +1,1 @@
+ALTER TABLE admins ADD COLUMN IF NOT EXISTS password_hash VARCHAR(120);
