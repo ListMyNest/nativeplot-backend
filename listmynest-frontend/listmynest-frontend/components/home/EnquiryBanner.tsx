@@ -38,10 +38,18 @@ export function EnquiryBanner() {
               Call Us
             </a>
           ) : (
-            <span className="flex min-h-[48px] cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-lmn-primary/40 text-center text-sm font-semibold text-white">
+            <button
+              type="button"
+              onClick={() =>
+                window.alert(
+                  "Enquiry phone not configured. Set NEXT_PUBLIC_ENQUIRY_PHONE in listmynest-frontend/listmynest-frontend/.env.local (then restart dev server)."
+                )
+              }
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-lmn-primary/40 text-center text-sm font-semibold text-white"
+            >
               <span aria-hidden>📞</span>
               Call Us
-            </span>
+            </button>
           )}
           {wa ? (
             <a
@@ -54,10 +62,18 @@ export function EnquiryBanner() {
               WhatsApp Us
             </a>
           ) : (
-            <span className="flex min-h-[48px] cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-lmn-whatsapp/40 text-center text-sm font-semibold text-white">
+            <button
+              type="button"
+              onClick={() =>
+                window.alert(
+                  "Enquiry phone not configured. Set NEXT_PUBLIC_ENQUIRY_PHONE in listmynest-frontend/listmynest-frontend/.env.local (then restart dev server)."
+                )
+              }
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-lmn-whatsapp/40 text-center text-sm font-semibold text-white"
+            >
               <span aria-hidden>💬</span>
               WhatsApp Us
-            </span>
+            </button>
           )}
         </div>
       </div>

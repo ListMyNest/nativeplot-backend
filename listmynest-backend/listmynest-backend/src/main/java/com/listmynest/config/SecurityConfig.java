@@ -67,15 +67,18 @@ public class SecurityConfig {
                         .requestMatchers("/v1/properties/*/photos/**").hasRole("SELLER")
                         .requestMatchers("/v1/agents/**").hasRole("AGENT")
                         .requestMatchers(HttpMethod.GET, "/v1/visits").hasRole("AGENT")
-                        .requestMatchers(HttpMethod.PATCH, "/v1/visits/**/status").hasRole("AGENT")
-                        .requestMatchers(HttpMethod.PATCH, "/v1/visits/**/reschedule").hasRole("AGENT")
+                        // PathPattern (Spring 6) does not allow `**` in the middle (e.g. `/**/status`).
+                        // Our visit endpoints are `/v1/visits/{id}/status` and `/v1/visits/{id}/reschedule`.
+                        .requestMatchers(HttpMethod.PATCH, "/v1/visits/*/status").hasRole("AGENT")
+                        .requestMatchers(HttpMethod.PATCH, "/v1/visits/*/reschedule").hasRole("AGENT")
                         .requestMatchers(HttpMethod.GET, "/v1/leads/seller").hasRole("SELLER")
                         .requestMatchers(HttpMethod.GET, "/v1/leads").hasRole("AGENT")
                         .requestMatchers("/v1/admin/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(requestLoggingFilter, JwtAuthFilter.class)
+                // JwtAuthFilter is a custom filter (no built-in order), so anchor relative to a known filter.
+                .addFilterBefore(requestLoggingFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

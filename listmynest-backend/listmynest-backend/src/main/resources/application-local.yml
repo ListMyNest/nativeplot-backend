@@ -21,3 +21,9 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:5432/postgres}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+
+jwt:
+  # For local dev only. Override via JWT_SECRET in production.
+  secret: ${JWT_SECRET:local-dev-secret-key-replace-in-production-min-32-chars-okay}
+  expiry-hours: ${JWT_EXPIRY_HOURS:24}
+  admin-expiry-hours: ${ADMIN_JWT_EXPIRY_HOURS:8}

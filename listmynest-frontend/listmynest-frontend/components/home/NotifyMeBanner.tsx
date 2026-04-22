@@ -32,9 +32,17 @@ export function NotifyMeBanner() {
             Notify Me on WhatsApp
           </a>
         ) : (
-          <span className="mt-4 flex min-h-[48px] w-full cursor-not-allowed items-center justify-center rounded-xl bg-lmn-whatsapp/40 text-center text-sm font-semibold text-white">
+          <button
+            type="button"
+            onClick={() =>
+              window.alert(
+                "Enquiry phone not configured. Set NEXT_PUBLIC_ENQUIRY_PHONE in listmynest-frontend/listmynest-frontend/.env.local (then restart dev server)."
+              )
+            }
+            className="mt-4 flex min-h-[48px] w-full items-center justify-center rounded-xl bg-lmn-whatsapp/40 text-center text-sm font-semibold text-white"
+          >
             Notify Me on WhatsApp
-          </span>
+          </button>
         )}
       </div>
     </section>

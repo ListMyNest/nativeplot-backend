@@ -19,8 +19,24 @@ import { digitsToIndiaE164, isTenIndiaDigits } from "../../../lib/phone";
 import { useAuthStore } from "../../../lib/store";
 import { showToast } from "../../../lib/toast";
 import { PhoneDigitsField } from "../../../components/ui/PhoneDigitsField";
+import { ApiError } from "../../../lib/api";
 
 type Tab = "listings" | "visits" | "agents" | "sellers";
+
+function humanizeAdminCreateError(err: unknown, fallback: string): string {
+  if (!(err instanceof Error)) return fallback;
+  const msg = err.message || fallback;
+  // Backend uses short codes via AppException.message.
+  if (!(err instanceof ApiError)) return msg;
+  switch (err.message) {
+    case "PHONE_IN_USE":
+      return "That phone number is already in use.";
+    case "UNAUTHORIZED":
+      return "Your session expired. Please log in again.";
+    default:
+      return msg;
+  }
+}
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -153,6 +169,14 @@ export default function AdminDashboardPage() {
 
   const onCreateAgent = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!agentName.trim()) {
+      showToast("Enter agent name.", "error");
+      return;
+    }
+    if (agentPassword.trim().length < 6) {
+      showToast("Password must be at least 6 characters.", "error");
+      return;
+    }
     if (!isTenIndiaDigits(agentDigits)) {
       showToast("Enter a valid 10-digit mobile number for the agent.", "error");
       return;
@@ -167,6 +191,7 @@ export default function AdminDashboardPage() {
       waE164 = digitsToIndiaE164(agentWaDigits);
     }
     try {
+      setLoading(true);
       await adminCreateAgent({
         name: agentName.trim(),
         phone: phoneE164,
@@ -182,19 +207,30 @@ export default function AdminDashboardPage() {
       await loadAgents();
     } catch (err) {
       showToast(
-        err instanceof Error ? err.message : "Could not create agent.",
+        humanizeAdminCreateError(err, "Could not create agent."),
         "error"
       );
+    } finally {
+      setLoading(false);
     }
   };
 
   const onCreateSeller = async (e: FormEvent) => {
     e.preventDefault();
+    if (!sellerName.trim()) {
+      showToast("Enter seller name.", "error");
+      return;
+    }
+    if (sellerPassword.trim().length < 6) {
+      showToast("Password must be at least 6 characters.", "error");
+      return;
+    }
     if (!isTenIndiaDigits(sellerDigits)) {
       showToast("Enter a valid 10-digit mobile number for the seller.", "error");
       return;
     }
     try {
+      setLoading(true);
       await adminCreateSeller({
         name: sellerName.trim(),
         phone: digitsToIndiaE164(sellerDigits),
@@ -207,9 +243,11 @@ export default function AdminDashboardPage() {
       await loadSellers();
     } catch (err) {
       showToast(
-        err instanceof Error ? err.message : "Could not create seller.",
+        humanizeAdminCreateError(err, "Could not create seller."),
         "error"
       );
+    } finally {
+      setLoading(false);
     }
   };
 
