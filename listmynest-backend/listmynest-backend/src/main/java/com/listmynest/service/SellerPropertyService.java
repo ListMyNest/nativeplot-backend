@@ -11,6 +11,7 @@ import com.listmynest.model.Seller;
 import com.listmynest.repository.PropertyRepository;
 import com.listmynest.repository.SellerRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SellerPropertyService {
 
     private static final BigDecimal LAKH_TO_RUPEE = new BigDecimal("100000");
@@ -110,6 +112,13 @@ public class SellerPropertyService {
             p.setVerified(true);
             p = propertyRepository.save(p);
         }
+        log.info(
+                "PROPERTY_CREATED id={} city={} type={} seller={}",
+                p.getId(),
+                p.getCity(),
+                p.getType().name(),
+                sellerId
+        );
         return p.getId();
     }
 }

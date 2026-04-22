@@ -16,6 +16,8 @@ import java.time.Instant;
 @Slf4j
 public class PropertyLifecycleJobService {
 
+    private static final String JOB = "PropertyLifecycleJobService";
+
     private final PropertyRepository propertyRepository;
     private final RedisService redisService;
     private final MSG91Service msg91Service;
@@ -41,7 +43,11 @@ public class PropertyLifecycleJobService {
                 log.warn("30-day warning skipped — no seller phone for property {}", property.getId());
             }
             redisService.set(redisKey, "{\"notified_at\":\"" + now + "\"}", 1296000);
-            log.info("30-day warning sent for property {}", property.getId());
+            log.warn(
+                    "SCHEDULER_ACTION job={} property={} action=THIRTY_DAY_INACTIVITY_WARNING",
+                    JOB,
+                    property.getId()
+            );
             n++;
         }
         return n;
@@ -64,7 +70,11 @@ public class PropertyLifecycleJobService {
             } else {
                 log.warn("45-day inactive SMS skipped — no seller phone for property {}", property.getId());
             }
-            log.info("Auto-inactivated property {}", property.getId());
+            log.warn(
+                    "SCHEDULER_ACTION job={} property={} action=AUTO_INACTIVE_45_DAY",
+                    JOB,
+                    property.getId()
+            );
             n++;
         }
         return n;
@@ -77,7 +87,11 @@ public class PropertyLifecycleJobService {
         for (Property property : propertyRepository.findByStatusAndSoldAtBefore(PropertyStatus.SOLD, cutoff)) {
             property.setStatus(PropertyStatus.ARCHIVED);
             propertyRepository.save(property);
-            log.info("Archived sold property {}", property.getId());
+            log.warn(
+                    "SCHEDULER_ACTION job={} property={} action=ARCHIVE_SOLD_BADGE_EXPIRED",
+                    JOB,
+                    property.getId()
+            );
             n++;
         }
         return n;

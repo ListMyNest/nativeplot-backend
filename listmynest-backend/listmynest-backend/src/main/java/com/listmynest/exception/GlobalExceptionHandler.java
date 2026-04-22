@@ -43,7 +43,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorBody> handleAccessDenied(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
-                new ErrorBody(false, "Access denied", null)
+                new ErrorBody(false, "FORBIDDEN", null)
         );
     }
 
@@ -74,7 +74,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorBody> handleGeneric(Exception ex, HttpServletRequest request) {
         log.error("{} {} — {}", request.getMethod(), request.getRequestURI(), ex.toString(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                new ErrorBody(false, "Internal server error", null)
+                new ErrorBody(false, "INTERNAL_ERROR", null)
         );
     }
 

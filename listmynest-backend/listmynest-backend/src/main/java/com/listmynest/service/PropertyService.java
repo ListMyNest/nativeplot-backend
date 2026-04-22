@@ -9,7 +9,9 @@ import com.listmynest.model.PropertyStatus;
 import com.listmynest.model.PropertyType;
 import com.listmynest.repository.PropertyRepository;
 import jakarta.persistence.criteria.Predicate;
+import com.listmynest.util.LogMaskUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -27,6 +29,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PropertyService {
 
     private final PropertyRepository propertyRepository;
@@ -104,6 +107,12 @@ public class PropertyService {
         if (hit > 1L) {
             return;
         }
+        log.info(
+                "PROPERTY_VIEWED id={} city={} session={}",
+                propertyId,
+                p.getCity(),
+                LogMaskUtil.shortHash(session)
+        );
         Long agg = redisService.increment("view_count:" + propertyId);
         if (agg == null) {
             propertyRepository.incrementViewCount(propertyId, 1);

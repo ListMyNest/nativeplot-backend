@@ -11,6 +11,7 @@ import com.listmynest.model.Agent;
 import com.listmynest.model.Seller;
 import com.listmynest.repository.AgentRepository;
 import com.listmynest.repository.SellerRepository;
+import com.listmynest.util.LogMaskUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -69,6 +70,7 @@ public class AuthService {
         }
         int count = parseCount(existing);
         if (count >= 3) {
+            log.warn("RATE_LIMIT_HIT phone={} action=OTP_SEND", LogMaskUtil.maskPhone(phone));
             throw new AppException(429, "OTP_LIMIT_EXCEEDED");
         }
 
@@ -98,13 +100,18 @@ public class AuthService {
         boolean devMode = msg91AuthKey == null || msg91AuthKey.isBlank();
         if (devMode) {
             log.warn("MSG91_AUTH_KEY is blank — skipping SMS send (dev mode)");
-            log.info("DEV MODE OTP for {}: {}", phone, otp);
+            log.info(
+                    "OTP_SENT phone={} mode=DEV(no_msg91) devOtpReturnedToClient=true",
+                    LogMaskUtil.maskPhone(phone)
+            );
             return otp;
         }
 
         if (!msg91Service.sendSms(phone, "Your ListMyNest OTP is " + otp)) {
+            log.warn("OTP_FAILED phone={} reason=SMS_SEND_FAILED attempts=n/a", LogMaskUtil.maskPhone(phone));
             throw new AppException(503, "SMS_SEND_FAILED");
         }
+        log.info("OTP_SENT phone={} mode=MSG91", LogMaskUtil.maskPhone(phone));
         return null;
     }
 
@@ -120,12 +127,14 @@ public class AuthService {
             raw = localOtpFallback.get(key);
         }
         if (raw == null) {
+            log.warn("OTP_FAILED phone={} reason=OTP_EXPIRED attempts=n/a", LogMaskUtil.maskPhone(phone));
             throw new AppException(400, "OTP_EXPIRED");
         }
 
         String storedHash = parseHash(raw);
         int attempts = parseAttempts(raw);
         if (attempts >= 3) {
+            log.warn("OTP_FAILED phone={} reason=OTP_MAX_ATTEMPTS attempts={}", LogMaskUtil.maskPhone(phone), attempts);
             throw new AppException(400, "OTP_MAX_ATTEMPTS");
         }
 
@@ -147,6 +156,11 @@ public class AuthService {
                 log.warn("Redis unavailable - running in no-cache dev mode");
                 localOtpFallback.put(key, updated);
             }
+            log.warn(
+                    "OTP_FAILED phone={} reason=OTP_INVALID attempts={}",
+                    LogMaskUtil.maskPhone(phone),
+                    attempts + 1
+            );
             throw new AppException(400, "OTP_INVALID");
         }
 
@@ -161,6 +175,7 @@ public class AuthService {
         if (agent.isPresent()) {
             Agent a = agent.get();
             String token = jwtService.generateToken(a.getId(), "AGENT", java.util.Map.of());
+            log.info("OTP_VERIFIED phone={} role=AGENT source=MSG91", LogMaskUtil.maskPhone(phone));
             return new AuthResponse(token, "AGENT", a.getId(), a.getName());
         }
 
@@ -169,9 +184,11 @@ public class AuthService {
             Seller s = seller.get();
             String name = s.getName() == null ? "" : s.getName();
             String token = jwtService.generateToken(s.getId(), "SELLER");
+            log.info("OTP_VERIFIED phone={} role=SELLER source=MSG91", LogMaskUtil.maskPhone(phone));
             return new AuthResponse(token, "SELLER", s.getId(), name);
         }
 
+        log.warn("OTP_FAILED phone={} reason=USER_NOT_FOUND attempts=n/a", LogMaskUtil.maskPhone(phone));
         throw new AppException(404, "USER_NOT_FOUND");
     }
 
@@ -200,6 +217,7 @@ public class AuthService {
         if (agent.isPresent()) {
             Agent a = agent.get();
             String token = jwtService.generateToken(a.getId(), "AGENT", java.util.Map.of());
+            log.info("OTP_VERIFIED phone={} role=AGENT source=FIREBASE", LogMaskUtil.maskPhone(phone));
             return new AuthResponse(token, "AGENT", a.getId(), a.getName());
         }
 
@@ -208,9 +226,11 @@ public class AuthService {
             Seller s = seller.get();
             String name = s.getName() == null ? "" : s.getName();
             String token = jwtService.generateToken(s.getId(), "SELLER");
+            log.info("OTP_VERIFIED phone={} role=SELLER source=FIREBASE", LogMaskUtil.maskPhone(phone));
             return new AuthResponse(token, "SELLER", s.getId(), name);
         }
 
+        log.warn("OTP_FAILED phone={} reason=USER_NOT_FOUND source=FIREBASE", LogMaskUtil.maskPhone(phone));
         throw new AppException(404, "USER_NOT_FOUND");
     }
 
@@ -253,7 +273,11 @@ public class AuthService {
         seller = sellerRepository.save(seller);
         String name = seller.getName() == null ? "" : seller.getName();
         String token = jwtService.generateToken(seller.getId(), "SELLER");
-        log.info("Seller self-registered id={} phone={}", seller.getId(), req.phone());
+        log.info(
+                "SELLER_SELF_REGISTERED id={} phone={}",
+                seller.getId(),
+                LogMaskUtil.maskPhone(req.phone())
+        );
         return new AuthResponse(token, "SELLER", seller.getId(), name);
     }
 

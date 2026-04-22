@@ -52,6 +52,13 @@ public class AdminAuditService {
                     .notes(notes)
                     .build();
             auditLogRepository.save(row);
+            log.info(
+                    "ADMIN_ACTION admin={} action={} entity={} id={}",
+                    adminId,
+                    action,
+                    entityType == null ? "" : entityType,
+                    entityId == null ? "" : entityId
+            );
         } catch (Exception e) {
             log.error("Audit log failed for action {}: {}", action, e.getMessage());
         }

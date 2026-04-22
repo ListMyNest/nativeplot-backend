@@ -27,13 +27,17 @@ public class NotificationService {
 
     public void sendVisitNotification(Agent agent, Visit visit, Property property) {
         if (agent == null || !StringUtils.hasText(agent.getFcmToken())) {
-            log.debug("Skipping visit FCM: no agent token");
+            log.warn(
+                    "FCM_NO_TOKEN agent={} skipping push notification",
+                    agent == null ? "none" : agent.getId()
+            );
             return;
         }
         if (firebaseApp == null) {
-            log.warn("DEV MODE: Would send visit FCM to agent {}", agent.getId());
+            log.warn("FCM_FAILED agent={} error=Firebase_not_configured - continuing without push", agent.getId());
             return;
         }
+        long t0 = System.nanoTime();
         try {
             Message message = Message.builder()
                     .setToken(agent.getFcmToken())
@@ -45,20 +49,32 @@ public class NotificationService {
                     .putData("visitTime", visit.getVisitTime().toString())
                     .build();
             FirebaseMessaging.getInstance(firebaseApp).send(message);
+            long ms = (System.nanoTime() - t0) / 1_000_000L;
+            log.info("FCM_SENT agent={} type=NEW_VISIT duration={}ms", agent.getId(), ms);
         } catch (Exception e) {
-            log.error("FCM visit notification failed: {}", e.getMessage());
+            long ms = (System.nanoTime() - t0) / 1_000_000L;
+            log.warn(
+                    "FCM_FAILED agent={} error={} duration={}ms - continuing without push",
+                    agent.getId(),
+                    e.getMessage(),
+                    ms
+            );
         }
     }
 
     public void sendLeadNotification(Agent agent, Lead lead, Property property) {
         if (agent == null || !StringUtils.hasText(agent.getFcmToken())) {
-            log.debug("Skipping lead FCM: no agent token");
+            log.warn(
+                    "FCM_NO_TOKEN agent={} skipping push notification",
+                    agent == null ? "none" : agent.getId()
+            );
             return;
         }
         if (firebaseApp == null) {
-            log.warn("DEV MODE: Would send lead FCM to agent {}", agent.getId());
+            log.warn("FCM_FAILED agent={} error=Firebase_not_configured - continuing without push", agent.getId());
             return;
         }
+        long t0 = System.nanoTime();
         try {
             Message message = Message.builder()
                     .setToken(agent.getFcmToken())
@@ -69,20 +85,32 @@ public class NotificationService {
                     .putData("buyerPhone", lead.getBuyerPhone() == null ? "" : lead.getBuyerPhone())
                     .build();
             FirebaseMessaging.getInstance(firebaseApp).send(message);
+            long ms = (System.nanoTime() - t0) / 1_000_000L;
+            log.info("FCM_SENT agent={} type=NEW_LEAD duration={}ms", agent.getId(), ms);
         } catch (Exception e) {
-            log.error("FCM lead notification failed: {}", e.getMessage());
+            long ms = (System.nanoTime() - t0) / 1_000_000L;
+            log.warn(
+                    "FCM_FAILED agent={} error={} duration={}ms - continuing without push",
+                    agent.getId(),
+                    e.getMessage(),
+                    ms
+            );
         }
     }
 
     public void sendVisitReminderToAgent(Agent agent, Visit visit, Property property) {
         if (agent == null || !StringUtils.hasText(agent.getFcmToken())) {
-            log.debug("Skipping visit reminder FCM: no agent token");
+            log.warn(
+                    "FCM_NO_TOKEN agent={} skipping push notification",
+                    agent == null ? "none" : agent.getId()
+            );
             return;
         }
         if (firebaseApp == null) {
-            log.warn("DEV MODE: Would send visit reminder FCM to agent {}", agent.getId());
+            log.warn("FCM_FAILED agent={} error=Firebase_not_configured - continuing without push", agent.getId());
             return;
         }
+        long t0 = System.nanoTime();
         try {
             String text = "Visit reminder: " + visit.getBuyerPhone()
                     + " is visiting " + property.getTitle()
@@ -97,8 +125,16 @@ public class NotificationService {
                     .putData("message", text)
                     .build();
             FirebaseMessaging.getInstance(firebaseApp).send(message);
+            long ms = (System.nanoTime() - t0) / 1_000_000L;
+            log.info("FCM_SENT agent={} type=VISIT_REMINDER duration={}ms", agent.getId(), ms);
         } catch (Exception e) {
-            log.error("FCM visit reminder failed: {}", e.getMessage());
+            long ms = (System.nanoTime() - t0) / 1_000_000L;
+            log.warn(
+                    "FCM_FAILED agent={} error={} duration={}ms - continuing without push",
+                    agent.getId(),
+                    e.getMessage(),
+                    ms
+            );
         }
     }
 }

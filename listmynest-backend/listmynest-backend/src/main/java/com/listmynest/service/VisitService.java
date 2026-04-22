@@ -8,6 +8,7 @@ import com.listmynest.model.Visit;
 import com.listmynest.model.VisitStatus;
 import com.listmynest.dto.PageResponse;
 import com.listmynest.repository.PropertyRepository;
+import com.listmynest.util.LogMaskUtil;
 import com.listmynest.repository.VisitRepository;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -77,6 +78,15 @@ public class VisitService {
                 .postVisitWaSent(false)
                 .build();
         visit = visitRepository.save(visit);
+
+        log.info(
+                "VISIT_SCHEDULED id={} property={} date={} time={} agent={}",
+                visit.getId(),
+                propertyId,
+                visitDate,
+                visitTime,
+                property.getAgent() != null ? property.getAgent().getId() : "none"
+        );
 
         try {
             String visitSession = buyerPhone + "|" + propertyId;
@@ -183,12 +193,24 @@ public class VisitService {
                     visit.getProperty().getCity()
             );
             visit.setPostVisitWaSent(true);
+            log.info(
+                    "POST_VISIT_WA_SENT visitId={} buyerPhone={}",
+                    visit.getId(),
+                    LogMaskUtil.maskPhone(visit.getBuyerPhone())
+            );
         }
 
         visit = visitRepository.save(visit);
         Property property = visit.getProperty();
         property.setLastActivityAt(Instant.now());
         propertyRepository.save(property);
+
+        log.info(
+                "VISIT_STATUS_UPDATED id={} status={} agent={}",
+                visit.getId(),
+                status.name(),
+                agentId
+        );
 
         return toDto(visit);
     }

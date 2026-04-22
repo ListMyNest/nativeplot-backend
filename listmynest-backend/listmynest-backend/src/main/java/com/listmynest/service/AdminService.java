@@ -137,6 +137,7 @@ public class AdminService {
     public AdminPropertyDTO forceSetPropertyStatus(UUID propertyId, String newStatus, UUID adminId) {
         Property property = propertyRepository.findById(propertyId)
                 .orElseThrow(() -> new AppException(404, "PROPERTY_NOT_FOUND"));
+        PropertyStatus previous = property.getStatus();
         PropertyStatus st;
         try {
             st = PropertyStatus.valueOf(newStatus.trim().toUpperCase());
@@ -157,6 +158,13 @@ public class AdminService {
                 "PROPERTY",
                 propertyId,
                 "Status set to " + st.name()
+        );
+        log.info(
+                "PROPERTY_STATUS_CHANGED id={} from={} to={} by=ADMIN admin={}",
+                propertyId,
+                previous.name(),
+                st.name(),
+                adminId
         );
         return toAdminPropertyDto(property);
     }
@@ -286,6 +294,7 @@ public class AdminService {
                 sellerId,
                 "Admin issued impersonation token"
         );
+        log.warn("ADMIN_IMPERSONATION admin={} impersonating seller={}", adminId, sellerId);
         String name = seller.getName() == null ? "" : seller.getName();
         return new ImpersonationResponse(token, sellerId, name, ISO_INSTANT.format(exp.truncatedTo(ChronoUnit.SECONDS)));
     }

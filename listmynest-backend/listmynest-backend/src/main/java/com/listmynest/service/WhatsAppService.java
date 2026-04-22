@@ -3,6 +3,7 @@ package com.listmynest.service;
 import com.listmynest.exception.AppException;
 import com.listmynest.model.Property;
 import com.listmynest.repository.PropertyRepository;
+import com.listmynest.util.LogMaskUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,10 +44,14 @@ public class WhatsAppService {
             return;
         }
         if (!StringUtils.hasText(watiApiToken)) {
-            log.warn("DEV MODE: Would send post-visit WA to {} for property {}", buyerPhone, propertyTitle);
+            log.warn(
+                    "WATI_DEV_MODE_SKIP would have sent template=post_visit_feedback to {}",
+                    LogMaskUtil.maskPhone(buyerPhone)
+            );
             return;
         }
 
+        long t0 = System.nanoTime();
         try {
             String base = watiBaseUrl.endsWith("/") ? watiBaseUrl.substring(0, watiBaseUrl.length() - 1) : watiBaseUrl;
             String url = base + "/api/v1/sendTemplateMessage";
@@ -68,8 +73,20 @@ public class WhatsAppService {
             ));
 
             restTemplate.postForEntity(url, new HttpEntity<>(body, headers), String.class);
+            long ms = (System.nanoTime() - t0) / 1_000_000L;
+            log.info(
+                    "WATI_TEMPLATE_SENT phone={} template=post_visit_feedback duration={}ms",
+                    LogMaskUtil.maskPhone(buyerPhone),
+                    ms
+            );
         } catch (Exception e) {
-            log.error("Wati post-visit template failed for {}: {}", buyerPhone, e.getMessage());
+            long ms = (System.nanoTime() - t0) / 1_000_000L;
+            log.warn(
+                    "WATI_CALL_FAILED phone={} error={} duration={}ms - continuing without WA",
+                    LogMaskUtil.maskPhone(buyerPhone),
+                    e.getMessage(),
+                    ms
+            );
         }
     }
 

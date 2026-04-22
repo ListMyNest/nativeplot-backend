@@ -7,11 +7,9 @@ import com.listmynest.dto.PageResponse;
 import com.listmynest.dto.SellerLeadSummaryDTO;
 import com.listmynest.dto.WatiWebhookPayload;
 import com.listmynest.exception.AppException;
-import com.listmynest.model.Lead;
 import com.listmynest.service.LeadService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,7 +28,6 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/v1/leads")
 @RequiredArgsConstructor
-@Slf4j
 public class LeadController {
 
     private static final String WATI_SECRET_HEADER = "X-Wati-Secret";
@@ -42,16 +39,13 @@ public class LeadController {
 
     @PostMapping
     public ApiResponse logLead(@Valid @RequestBody LogLeadRequest request) {
-        Lead lead = leadService.logLead(
+        leadService.logLead(
                 request.propertyId(),
                 request.actionType(),
                 request.sessionHash(),
                 request.city(),
                 request.buyerPhone()
         );
-        if (lead == null) {
-            log.debug("Duplicate lead skipped for property {}", request.propertyId());
-        }
         return new ApiResponse(true, "Lead logged");
     }
 

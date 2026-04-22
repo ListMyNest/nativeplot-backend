@@ -1,5 +1,6 @@
 package com.listmynest.service;
 
+import com.listmynest.util.LogMaskUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,9 +31,13 @@ public class MSG91Service {
      */
     public boolean sendSms(String phone, String message) {
         if (authKey == null || authKey.isBlank()) {
-            log.warn("DEV MODE SMS to {}: {}", phone, message);
+            log.warn(
+                    "MSG91_DEV_MODE_SKIP phone={} durationMs=0 (message body not logged)",
+                    LogMaskUtil.maskPhone(phone)
+            );
             return true;
         }
+        long t0 = System.nanoTime();
         try {
             String mobiles = normalizeIndianMobile(phone);
             String uri = UriComponentsBuilder.fromHttpUrl(SEND_HTTP_URL)
@@ -45,10 +50,22 @@ public class MSG91Service {
                     .encode()
                     .toUriString();
             String body = restTemplate.getForObject(uri, String.class);
-            log.info("MSG91 sendhttp response for {}: {}", phone, body == null ? "(null)" : body.trim());
+            long ms = (System.nanoTime() - t0) / 1_000_000L;
+            log.info(
+                    "MSG91_CALL_OK phone={} duration={}ms response={}",
+                    LogMaskUtil.maskPhone(phone),
+                    ms,
+                    body == null ? "(null)" : body.trim()
+            );
             return true;
         } catch (Exception e) {
-            log.error("MSG91 SMS failed for {}: {}", phone, e.getMessage());
+            long ms = (System.nanoTime() - t0) / 1_000_000L;
+            log.error(
+                    "MSG91_CALL_FAILED phone={} duration={}ms error={}",
+                    LogMaskUtil.maskPhone(phone),
+                    ms,
+                    e.getMessage()
+            );
             return false;
         }
     }

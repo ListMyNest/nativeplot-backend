@@ -8,6 +8,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Component
@@ -15,6 +16,7 @@ import java.util.UUID;
 @Slf4j
 public class ViewCountFlushScheduler {
 
+    private static final String JOB = "ViewCountFlushScheduler";
     private static final String PREFIX = "view_count:";
 
     private final PropertyRepository propertyRepository;
@@ -23,6 +25,8 @@ public class ViewCountFlushScheduler {
     @Scheduled(fixedDelay = 60000)
     @Transactional
     public void flushViewCounts() {
+        long t0 = System.currentTimeMillis();
+        log.info("SCHEDULER_START job={} time={}", JOB, Instant.now());
         try {
             int flushed = 0;
             for (String key : redisService.scanKeys(PREFIX + "*")) {
@@ -54,10 +58,12 @@ public class ViewCountFlushScheduler {
                 propertyRepository.incrementViewCount(propertyId, count);
                 redisService.delete(key);
                 flushed++;
+                log.warn("SCHEDULER_ACTION job={} property={} action=FLUSH_VIEW_COUNT delta={}", JOB, propertyId, count);
             }
-            log.info("Flushed view counts for {} properties", flushed);
+            long ms = System.currentTimeMillis() - t0;
+            log.info("SCHEDULER_COMPLETE job={} processed={} duration={}ms", JOB, flushed, ms);
         } catch (Exception e) {
-            log.error("View count flush failed: {}", e.getMessage(), e);
+            log.error("SCHEDULER_ERROR job={} error={}", JOB, e.getMessage(), e);
         }
     }
 }

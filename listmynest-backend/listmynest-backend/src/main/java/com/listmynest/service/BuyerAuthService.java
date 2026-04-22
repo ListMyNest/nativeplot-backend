@@ -5,6 +5,7 @@ import com.listmynest.dto.BuyerAuthResponse;
 import com.listmynest.exception.AppException;
 import com.listmynest.model.Buyer;
 import com.listmynest.repository.BuyerRepository;
+import com.listmynest.util.LogMaskUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,6 +40,7 @@ public class BuyerAuthService {
         String existing = redis.get(countKey);
         int count = existing == null ? 0 : Integer.parseInt(existing);
         if (count >= 3) {
+            log.warn("RATE_LIMIT_HIT phone={} action=BUYER_OTP_SEND", LogMaskUtil.maskPhone(phone));
             throw new AppException(429, "OTP_LIMIT_EXCEEDED");
         }
 
@@ -55,12 +57,17 @@ public class BuyerAuthService {
         boolean devMode = msg91AuthKey == null || msg91AuthKey.isBlank();
         if (devMode) {
             log.warn("MSG91_AUTH_KEY is blank — skipping buyer SMS send (dev mode)");
-            log.info("DEV MODE OTP for {}: {}", phone, otp);
+            log.info(
+                    "OTP_SENT phone={} mode=DEV(no_msg91) role=BUYER",
+                    LogMaskUtil.maskPhone(phone)
+            );
             return;
         }
         if (!msg91Service.sendSms(phone, "Your ListMyNest verification code is " + otp)) {
+            log.warn("OTP_FAILED phone={} reason=SMS_SEND_FAILED role=BUYER", LogMaskUtil.maskPhone(phone));
             throw new AppException(503, "SMS_SEND_FAILED");
         }
+        log.info("OTP_SENT phone={} mode=MSG91 role=BUYER", LogMaskUtil.maskPhone(phone));
     }
 
     @Transactional
@@ -68,12 +75,18 @@ public class BuyerAuthService {
         String key = "buyer_otp:" + phone;
         String raw = redis.get(key);
         if (raw == null) {
+            log.warn("OTP_FAILED phone={} reason=OTP_EXPIRED role=BUYER", LogMaskUtil.maskPhone(phone));
             throw new AppException(400, "OTP_EXPIRED");
         }
 
         String storedHash = parseHash(raw);
         int attempts = parseAttempts(raw);
         if (attempts >= 3) {
+            log.warn(
+                    "OTP_FAILED phone={} reason=OTP_MAX_ATTEMPTS attempts={} role=BUYER",
+                    LogMaskUtil.maskPhone(phone),
+                    attempts
+            );
             throw new AppException(400, "OTP_MAX_ATTEMPTS");
         }
 
@@ -83,6 +96,11 @@ public class BuyerAuthService {
             Long ttl = redis.getExpireSeconds(key);
             long seconds = ttl == null || ttl <= 0 ? 300 : ttl;
             redis.set(key, otpJson(storedHash != null ? storedHash : "", next), seconds);
+            log.warn(
+                    "OTP_FAILED phone={} reason=OTP_INVALID attempts={} role=BUYER",
+                    LogMaskUtil.maskPhone(phone),
+                    next
+            );
             throw new AppException(400, "OTP_INVALID");
         }
 
@@ -101,6 +119,7 @@ public class BuyerAuthService {
         }
 
         String token = jwtService.generateToken(buyer.getId(), "BUYER", java.util.Map.of());
+        log.info("OTP_VERIFIED phone={} role=BUYER", LogMaskUtil.maskPhone(phone));
         return new BuyerAuthResponse(token, buyer.getId());
     }
 

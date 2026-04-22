@@ -14,6 +14,7 @@ import com.listmynest.repository.AgentRepository;
 import com.listmynest.repository.BuyerRepository;
 import com.listmynest.repository.LeadRepository;
 import com.listmynest.repository.PropertyRepository;
+import com.listmynest.util.LogMaskUtil;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,10 +59,15 @@ public class LeadService {
         Instant oneHourAgo = Instant.now().minus(1, ChronoUnit.HOURS);
         if (leadRepository.existsByPropertyIdAndSessionHashAndActionTypeAndCreatedAtAfter(
                 propertyId, sessionHash, type, oneHourAgo)) {
+            log.info(
+                    "LEAD_DUPLICATE_SKIPPED property={} session={}",
+                    propertyId,
+                    LogMaskUtil.shortHash(sessionHash)
+            );
             return null;
         }
 
-        enforceRateLimit(type, sessionHash, propertyId);
+        enforceRateLimit(type, sessionHash, propertyId, property.getCity());
 
         Lead lead = Lead.builder()
                 .property(property)
@@ -76,6 +82,13 @@ public class LeadService {
         Lead saved = leadRepository.save(lead);
         property.setLastActivityAt(Instant.now());
         propertyRepository.save(property);
+
+        log.info(
+                "LEAD_LOGGED property={} action={} city={}",
+                propertyId,
+                type.name(),
+                saved.getCity()
+        );
 
         try {
             if (property.getAgent() != null && StringUtils.hasText(property.getAgent().getFcmToken())) {
@@ -147,33 +160,55 @@ public class LeadService {
                 .orElseGet(() -> buyerRepository.save(Buyer.builder().phone(buyerPhone).build()));
 
         Optional<Lead> leadOpt = leadRepository.findUnresolvedWaLeadsByAgent(agent.getId());
+        String intentLabel = "UNKNOWN";
         if (leadOpt.isPresent()) {
             Lead lead = leadOpt.get();
             lead.setBuyerPhone(buyerPhone);
             lead.setBuyer(buyer);
             String text = payload.text() == null ? "" : payload.text().trim();
             switch (text) {
-                case "1" -> lead.setWaIntent(WaIntent.HOT);
-                case "2" -> lead.setWaIntent(WaIntent.WARM);
-                case "3" -> lead.setWaIntent(WaIntent.COLD);
+                case "1" -> {
+                    lead.setWaIntent(WaIntent.HOT);
+                    intentLabel = "HOT";
+                }
+                case "2" -> {
+                    lead.setWaIntent(WaIntent.WARM);
+                    intentLabel = "WARM";
+                }
+                case "3" -> {
+                    lead.setWaIntent(WaIntent.COLD);
+                    intentLabel = "COLD";
+                }
                 default -> { /* no intent */ }
             }
             leadRepository.save(lead);
         }
 
         buyerRepository.save(buyer);
+        log.info(
+                "WATI_INBOUND waId={} intent={}",
+                LogMaskUtil.maskPhone(buyerPhone),
+                intentLabel
+        );
     }
 
-    private void enforceRateLimit(LeadActionType type, String sessionHash, UUID propertyId) {
+    private void enforceRateLimit(LeadActionType type, String sessionHash, UUID propertyId, String city) {
         switch (type) {
-            case WHATSAPP -> bumpRateLimit("wa_rl:" + sessionHash + ":" + propertyId, 5, 3600);
-            case CALL -> bumpRateLimit("call_rl:" + sessionHash + ":" + propertyId, 5, 3600);
-            case VISIT_REQUEST -> bumpRateLimit("visit_rl:" + sessionHash, 3, 86400);
+            case WHATSAPP -> bumpRateLimit("wa_rl:" + sessionHash + ":" + propertyId, 5, 3600, propertyId, sessionHash, city);
+            case CALL -> bumpRateLimit("call_rl:" + sessionHash + ":" + propertyId, 5, 3600, propertyId, sessionHash, city);
+            case VISIT_REQUEST -> bumpRateLimit("visit_rl:" + sessionHash, 3, 86400, propertyId, sessionHash, city);
             default -> { }
         }
     }
 
-    private void bumpRateLimit(String key, int maxAllowed, int ttlSeconds) {
+    private void bumpRateLimit(
+            String key,
+            int maxAllowed,
+            int ttlSeconds,
+            UUID propertyId,
+            String sessionHash,
+            String city
+    ) {
         Long c = redisService.increment(key);
         if (c == null) {
             return;
@@ -182,6 +217,12 @@ public class LeadService {
             redisService.expire(key, ttlSeconds);
         }
         if (c > maxAllowed) {
+            log.warn(
+                    "LEAD_RATE_LIMIT property={} session={} city={}",
+                    propertyId,
+                    LogMaskUtil.shortHash(sessionHash),
+                    city == null ? "" : city
+            );
             throw new AppException(429, "RATE_LIMIT_EXCEEDED");
         }
     }
