@@ -17,6 +17,8 @@ import org.springframework.web.client.RestTemplate;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -36,8 +38,66 @@ public class WhatsAppService {
     @Value("${wati.base-url:https://live-server.wati.io}")
     private String watiBaseUrl;
 
+    @Value("${wati.template.visit-scheduled:visit_scheduled}")
+    private String visitScheduledTemplate;
+
+    @Value("${wati.template.visit-rescheduled:visit_rescheduled}")
+    private String visitRescheduledTemplate;
+
     @Value("${app.fallback-buyer-contact-phone:}")
     private String fallbackBuyerContactPhone;
+
+    private void sendTemplateMessage(String phoneE164, String templateName, Map<String, String> params) {
+        if (!StringUtils.hasText(phoneE164) || !StringUtils.hasText(templateName)) {
+            return;
+        }
+        if (!StringUtils.hasText(watiApiToken)) {
+            log.warn(
+                    "WATI_DEV_MODE_SKIP would have sent template={} to {}",
+                    templateName,
+                    LogMaskUtil.maskPhone(phoneE164)
+            );
+            return;
+        }
+        long t0 = System.nanoTime();
+        try {
+            String base = watiBaseUrl.endsWith("/") ? watiBaseUrl.substring(0, watiBaseUrl.length() - 1) : watiBaseUrl;
+            String url = base + "/api/v1/sendTemplateMessage";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(watiApiToken.trim());
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            String waDigits = phoneE164.replace("+", "").replaceAll("\\D", "");
+            String broadcast = templateName + "_" + Instant.now().getEpochSecond();
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("whatsappNumber", waDigits);
+            body.put("template_name", templateName);
+            body.put("broadcast_name", broadcast);
+            body.put("parameters", params.entrySet().stream()
+                    .map(e -> Map.of("name", e.getKey(), "value", e.getValue() == null ? "" : e.getValue()))
+                    .toList());
+
+            restTemplate.postForEntity(url, new HttpEntity<>(body, headers), String.class);
+            long ms = (System.nanoTime() - t0) / 1_000_000L;
+            log.info(
+                    "WATI_TEMPLATE_SENT phone={} template={} duration={}ms",
+                    LogMaskUtil.maskPhone(phoneE164),
+                    templateName,
+                    ms
+            );
+        } catch (Exception e) {
+            long ms = (System.nanoTime() - t0) / 1_000_000L;
+            log.warn(
+                    "WATI_CALL_FAILED phone={} template={} error={} duration={}ms - continuing without WA",
+                    LogMaskUtil.maskPhone(phoneE164),
+                    templateName,
+                    e.getMessage(),
+                    ms
+            );
+        }
+    }
 
     public void sendPostVisitTemplate(String buyerPhone, String propertyTitle, String city) {
         if (!StringUtils.hasText(buyerPhone)) {
@@ -88,6 +148,32 @@ public class WhatsAppService {
                     ms
             );
         }
+    }
+
+    public void sendVisitScheduledTemplate(String buyerPhone, String propertyTitle, String city, LocalDate date, LocalTime time) {
+        sendTemplateMessage(
+                buyerPhone,
+                visitScheduledTemplate,
+                Map.of(
+                        "property_name", propertyTitle == null ? "" : propertyTitle,
+                        "city", city == null ? "" : city,
+                        "visit_date", date == null ? "" : date.toString(),
+                        "visit_time", time == null ? "" : time.toString()
+                )
+        );
+    }
+
+    public void sendVisitRescheduledTemplate(String buyerPhone, String propertyTitle, String city, LocalDate date, LocalTime time) {
+        sendTemplateMessage(
+                buyerPhone,
+                visitRescheduledTemplate,
+                Map.of(
+                        "property_name", propertyTitle == null ? "" : propertyTitle,
+                        "city", city == null ? "" : city,
+                        "visit_date", date == null ? "" : date.toString(),
+                        "visit_time", time == null ? "" : time.toString()
+                )
+        );
     }
 
     public Map<String, String> getWhatsAppLink(UUID propertyId, String sessionHash) {

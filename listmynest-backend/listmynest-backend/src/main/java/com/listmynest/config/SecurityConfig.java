@@ -48,6 +48,7 @@ public class SecurityConfig {
                         .requestMatchers("/v1/buyers/otp/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/v1/notify-me").permitAll()
                         .requestMatchers(HttpMethod.GET, "/v1/config/site").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/public/agents").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**").permitAll()
                         .requestMatchers("/v3/api-docs/**").permitAll()

@@ -88,8 +88,8 @@ export default function AccountPage() {
       <main className="mx-auto max-w-lg space-y-6 py-8">
         <h1 className="text-2xl font-extrabold text-lmn-dark">Hub</h1>
         <p className="text-sm text-lmn-muted">
-          Sign in as seller, agent, or admin. New to ListMyNest? It&apos;s free
-          to list your property.
+          Sign in as a seller to manage your listings. New to ListMyNest?
+          It&apos;s free to list your property.
         </p>
         <div className="flex flex-col gap-3">
           <Link
@@ -97,18 +97,6 @@ export default function AccountPage() {
             className="flex min-h-[48px] items-center justify-center rounded-xl bg-lmn-primary text-base font-semibold text-white"
           >
             🏠 I&apos;m a Seller
-          </Link>
-          <Link
-            href="/agent/login"
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-lmn-primary text-base font-semibold text-lmn-primary"
-          >
-            🤝 I&apos;m an Agent
-          </Link>
-          <Link
-            href="/admin/login"
-            className="flex min-h-[48px] items-center justify-center rounded-xl bg-lmn-dark text-base font-semibold text-white"
-          >
-            👑 Admin Portal
           </Link>
         </div>
       </main>

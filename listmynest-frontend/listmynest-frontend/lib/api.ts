@@ -372,6 +372,7 @@ export async function registerSellerAccount(data: {
   name: string;
   phone: string;
   password: string;
+  preferredAgentId?: string | null;
 }) {
   const raw = await apiFetch<Record<string, unknown>>("/auth/seller/register", {
     method: "POST",

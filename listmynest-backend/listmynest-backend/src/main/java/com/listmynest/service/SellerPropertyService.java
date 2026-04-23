@@ -82,6 +82,7 @@ public class SellerPropertyService {
                 .configuration(cfg)
                 .bathrooms(req.bathrooms())
                 .possession(pos)
+                .agent(seller.getPreferredAgent())
                 .seller(seller)
                 .build();
 
@@ -108,10 +109,15 @@ public class SellerPropertyService {
 
         p = propertyRepository.save(p);
         if (Arrays.asList(environment.getActiveProfiles()).contains("local")) {
+            // Local dev convenience: auto-approve listings so they show up immediately.
             p.setStatus(PropertyStatus.ACTIVE);
             p.setVerified(true);
-            p = propertyRepository.save(p);
+        } else {
+            // Production: listings must be approved by admin before becoming visible publicly.
+            p.setStatus(PropertyStatus.PENDING_REVIEW);
+            p.setVerified(false);
         }
+        p = propertyRepository.save(p);
         log.info(
                 "PROPERTY_CREATED id={} city={} type={} seller={}",
                 p.getId(),

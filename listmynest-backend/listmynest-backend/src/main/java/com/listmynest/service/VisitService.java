@@ -101,6 +101,19 @@ public class VisitService {
             log.warn("Visit FCM notification skipped: {}", e.getMessage());
         }
 
+        try {
+            // Buyer gets WhatsApp confirmation (best-effort; no-op in dev without WATI token).
+            whatsAppService.sendVisitScheduledTemplate(
+                    buyerPhone,
+                    property.getTitle(),
+                    property.getCity(),
+                    visitDate,
+                    visitTime
+            );
+        } catch (Exception e) {
+            log.warn("Visit WhatsApp notification skipped: {}", e.getMessage());
+        }
+
         property.setLastActivityAt(Instant.now());
         propertyRepository.save(property);
 
@@ -124,7 +137,8 @@ public class VisitService {
     @Transactional(readOnly = true)
     public List<VisitDTO> listVisitsForSeller(UUID sellerId) {
         return visitRepository.findByPropertySellerIdOrderByVisitDateAscVisitTimeAsc(sellerId).stream()
-                .map(this::toDto)
+                // Seller should not see buyer contact details.
+                .map(this::toMaskedDto)
                 .toList();
     }
 
@@ -164,7 +178,8 @@ public class VisitService {
                     }
                     return a.getVisitTime().compareTo(b.getVisitTime());
                 })
-                .map(this::toDto)
+                // Agent should not see buyer contact details (admin only).
+                .map(this::toMaskedDto)
                 .toList();
     }
 
@@ -235,6 +250,19 @@ public class VisitService {
         visit.setVisitTime(newTime);
         visit.setStatus(VisitStatus.RESCHEDULED);
         visit = visitRepository.save(visit);
+
+        try {
+            whatsAppService.sendVisitRescheduledTemplate(
+                    visit.getBuyerPhone(),
+                    visit.getProperty().getTitle(),
+                    visit.getProperty().getCity(),
+                    newDate,
+                    newTime
+            );
+        } catch (Exception e) {
+            log.warn("Reschedule WhatsApp notification skipped: {}", e.getMessage());
+        }
+
         return toDto(visit);
     }
 
@@ -245,6 +273,22 @@ public class VisitService {
                 v.getProperty().getId(),
                 v.getProperty().getTitle(),
                 v.getBuyerPhone(),
+                v.getVisitDate(),
+                v.getVisitTime(),
+                v.getStatus().name(),
+                v.getPostVisitWaSent(),
+                v.getNotes(),
+                ISO_INSTANT.format(created.truncatedTo(ChronoUnit.SECONDS))
+        );
+    }
+
+    private VisitDTO toMaskedDto(Visit v) {
+        Instant created = v.getCreatedAt() != null ? v.getCreatedAt() : Instant.now();
+        return new VisitDTO(
+                v.getId(),
+                v.getProperty().getId(),
+                v.getProperty().getTitle(),
+                null,
                 v.getVisitDate(),
                 v.getVisitTime(),
                 v.getStatus().name(),

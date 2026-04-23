@@ -27,6 +27,8 @@ export default function SellerRegisterPage() {
   const setAuth = useAuthStore((s) => s.setAuth);
   const hydrateFromStorage = useAuthStore((s) => s.hydrateFromStorage);
 
+  const [agents, setAgents] = useState<{ id: string; name: string }[]>([]);
+  const [preferredAgentId, setPreferredAgentId] = useState<string>("");
   const [name, setName] = useState("");
   const [digits, setDigits] = useState("");
   const [password, setPassword] = useState("");
@@ -37,6 +39,30 @@ export default function SellerRegisterPage() {
   useEffect(() => {
     hydrateFromStorage();
   }, [hydrateFromStorage]);
+
+  useEffect(() => {
+    void fetch(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL ?? ""}/public/agents`,
+      { cache: "no-store" }
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: unknown) => {
+        if (!data || !Array.isArray(data)) return;
+        const normalized = data
+          .map((x) => {
+            const o = x as Record<string, unknown>;
+            return {
+              id: String(o.id ?? ""),
+              name: String(o.name ?? ""),
+            };
+          })
+          .filter((a) => a.id && a.name);
+        setAgents(normalized);
+      })
+      .catch(() => {
+        /* optional */
+      });
+  }, []);
 
   const phoneE164 = `+91${digits.replace(/\D/g, "").slice(0, 10)}`;
   const tenOk = digits.replace(/\D/g, "").length === 10;
@@ -65,6 +91,7 @@ export default function SellerRegisterPage() {
         name: n,
         phone: phoneE164,
         password: password.trim(),
+        preferredAgentId: preferredAgentId || null,
       });
       const role = String(res.role).toUpperCase();
       if (role !== "SELLER") {
@@ -109,6 +136,24 @@ export default function SellerRegisterPage() {
         </p>
 
         <div className="space-y-4">
+          <label className="block text-xs font-semibold text-lmn-muted">
+            Preferred agent (optional)
+            <select
+              className="mt-2 min-h-[48px] w-full rounded-xl border border-lmn-border bg-white px-4 text-base text-lmn-dark outline-none focus:border-lmn-primary focus:ring-2 focus:ring-lmn-primary/20"
+              value={preferredAgentId}
+              onChange={(e) => setPreferredAgentId(e.target.value)}
+              disabled={busy || agents.length === 0}
+            >
+              <option value="">
+                {agents.length === 0 ? "Loading agents…" : "Select an agent"}
+              </option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="block text-xs font-semibold text-lmn-muted">
             Full name
             <input

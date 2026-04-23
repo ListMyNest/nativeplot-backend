@@ -46,6 +46,16 @@ public class PropertyController {
         return propertyService.listPublicProperties(city, type, priceMin, priceMax, page, size);
     }
 
+    @GetMapping("/properties/search")
+    public PageResponse<PublicPropertyDTO> searchProperties(
+            @RequestParam(name = "q") String q,
+            @RequestParam(required = false) String city,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return propertyService.searchPublicProperties(q, city, page, size);
+    }
+
     @GetMapping("/properties/{id}")
     public PropertyDetailDTO getProperty(@PathVariable UUID id) {
         return propertyService.getPublicDetailById(id);

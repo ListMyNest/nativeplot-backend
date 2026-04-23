@@ -265,10 +265,19 @@ public class AuthService {
         if (sellerRepository.existsByPhone(req.phone())) {
             throw new AppException(409, "PHONE_IN_USE");
         }
+        Agent preferred = null;
+        if (req.preferredAgentId() != null) {
+            preferred = agentRepository.findById(req.preferredAgentId())
+                    .orElseThrow(() -> new AppException(400, "INVALID_AGENT"));
+            if (!Boolean.TRUE.equals(preferred.getActive())) {
+                throw new AppException(400, "AGENT_INACTIVE");
+            }
+        }
         Seller seller = Seller.builder()
                 .name(req.name().trim())
                 .phone(req.phone())
                 .passwordHash(passwordEncoder.encode(req.password()))
+                .preferredAgent(preferred)
                 .build();
         seller = sellerRepository.save(seller);
         String name = seller.getName() == null ? "" : seller.getName();

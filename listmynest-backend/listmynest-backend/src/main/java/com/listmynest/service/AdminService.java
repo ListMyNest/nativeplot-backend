@@ -150,6 +150,9 @@ public class AdminService {
         }
         if (st == PropertyStatus.ACTIVE) {
             property.setVerified(true);
+        } else if (st == PropertyStatus.INACTIVE || st == PropertyStatus.ARCHIVED) {
+            // If an admin rejects/unpublishes a listing, it should not be treated as verified/featured.
+            property.setVerified(false);
         }
         propertyRepository.save(property);
         adminAuditService.log(
@@ -254,10 +257,16 @@ public class AdminService {
         if (sellerRepository.existsByPhone(req.phone())) {
             throw new AppException(409, "PHONE_IN_USE");
         }
+        Agent preferred = null;
+        if (req.preferredAgentId() != null) {
+            preferred = agentRepository.findById(req.preferredAgentId())
+                    .orElseThrow(() -> new AppException(400, "INVALID_AGENT"));
+        }
         Seller seller = Seller.builder()
                 .name(req.name())
                 .phone(req.phone())
                 .passwordHash(passwordEncoder.encode(req.password()))
+                .preferredAgent(preferred)
                 .build();
         seller = sellerRepository.save(seller);
         adminAuditService.log(adminId, AdminAuditService.SELLER_CREATED, "SELLER", seller.getId(), null);

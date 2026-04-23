@@ -11,9 +11,7 @@ const MAIN_LINKS = [
 ] as const;
 
 const HUB_LINKS = [
-  { href: "/agent/login", label: "Agent sign-in" },
   { href: "/seller/login", label: "Seller sign-in" },
-  { href: "/admin/login", label: "Admin" },
   { href: "/saved", label: "Saved listings" },
   { href: "/account", label: "Hub home" },
 ] as const;
@@ -96,7 +94,7 @@ export function TopNav() {
                 role="menu"
               >
                 <p className="border-b border-lmn-border px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-lmn-muted">
-                  Agents, sellers &amp; admin
+                  Seller tools
                 </p>
                 {HUB_LINKS.map(({ href, label }) => (
                   <Link

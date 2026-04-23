@@ -58,6 +58,41 @@ public class PropertyService {
     }
 
     @Transactional(readOnly = true)
+    public PageResponse<PublicPropertyDTO> searchPublicProperties(
+            String q,
+            String city,
+            int page,
+            int size
+    ) {
+        String query = q == null ? "" : q.trim();
+        if (query.isEmpty()) {
+            return new PageResponse<>(List.of(), Math.max(0, page), Math.min(100, Math.max(1, size)), 0);
+        }
+        String like = "%" + query.toLowerCase() + "%";
+        Specification<Property> spec = (root, jpaQuery, cb) -> {
+            List<Predicate> parts = new ArrayList<>();
+            parts.add(cb.equal(root.get("status"), PropertyStatus.ACTIVE));
+            parts.add(cb.or(
+                    cb.like(cb.lower(root.get("title")), like),
+                    cb.like(cb.lower(root.get("description")), like)
+            ));
+            if (StringUtils.hasText(city)) {
+                parts.add(cb.equal(cb.lower(root.get("city")), city.trim().toLowerCase()));
+            }
+            return cb.and(parts.toArray(Predicate[]::new));
+        };
+        int p = Math.max(0, page);
+        int s = Math.min(100, Math.max(1, size));
+        Page<Property> result = propertyRepository.findAll(
+                spec,
+                PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "createdAt"))
+        );
+        List<PublicPropertyDTO> content =
+                result.getContent().stream().map(propertyListingAssembler::toPublicDto).toList();
+        return new PageResponse<>(content, result.getNumber(), result.getSize(), result.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
     public PageResponse<PublicPropertyDTO> listFeaturedProperties(int page, int size) {
         Specification<Property> spec = (root, query, cb) -> cb.and(
                 cb.equal(root.get("status"), PropertyStatus.ACTIVE),
