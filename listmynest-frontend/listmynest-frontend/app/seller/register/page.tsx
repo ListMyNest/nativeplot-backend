@@ -42,7 +42,7 @@ export default function SellerRegisterPage() {
 
   useEffect(() => {
     void fetch(
-      `${process.env.NEXT_PUBLIC_API_BASE_URL ?? ""}/public/agents`,
+      `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1"}/public/agents`,
       { cache: "no-store" }
     )
       .then((r) => (r.ok ? r.json() : null))

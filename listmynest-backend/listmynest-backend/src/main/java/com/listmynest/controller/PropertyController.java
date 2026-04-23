@@ -28,10 +28,11 @@ public class PropertyController {
 
     @GetMapping("/properties/featured")
     public PageResponse<PublicPropertyDTO> getFeatured(
+            @RequestParam(required = false) String city,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return propertyService.listFeaturedProperties(page, size);
+        return propertyService.listFeaturedProperties(city, page, size);
     }
 
     @GetMapping("/properties")

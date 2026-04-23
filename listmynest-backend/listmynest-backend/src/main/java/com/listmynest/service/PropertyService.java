@@ -93,11 +93,16 @@ public class PropertyService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<PublicPropertyDTO> listFeaturedProperties(int page, int size) {
-        Specification<Property> spec = (root, query, cb) -> cb.and(
-                cb.equal(root.get("status"), PropertyStatus.ACTIVE),
-                cb.isTrue(root.get("verified"))
-        );
+    public PageResponse<PublicPropertyDTO> listFeaturedProperties(String city, int page, int size) {
+        Specification<Property> spec = (root, query, cb) -> {
+            List<Predicate> parts = new ArrayList<>();
+            parts.add(cb.equal(root.get("status"), PropertyStatus.ACTIVE));
+            parts.add(cb.isTrue(root.get("verified")));
+            if (StringUtils.hasText(city)) {
+                parts.add(cb.equal(cb.lower(root.get("city")), city.trim().toLowerCase()));
+            }
+            return cb.and(parts.toArray(Predicate[]::new));
+        };
         int p = Math.max(0, page);
         int s = Math.min(100, Math.max(1, size));
         Page<Property> result = propertyRepository.findAll(
