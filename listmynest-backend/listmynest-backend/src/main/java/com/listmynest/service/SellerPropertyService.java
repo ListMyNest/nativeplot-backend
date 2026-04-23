@@ -108,15 +108,10 @@ public class SellerPropertyService {
         }
 
         p = propertyRepository.save(p);
-        if (Arrays.asList(environment.getActiveProfiles()).contains("local")) {
-            // Local dev convenience: auto-approve listings so they show up immediately.
-            p.setStatus(PropertyStatus.ACTIVE);
-            p.setVerified(true);
-        } else {
-            // Production: listings must be approved by admin before becoming visible publicly.
-            p.setStatus(PropertyStatus.PENDING_REVIEW);
-            p.setVerified(false);
-        }
+        // Always gate public visibility behind admin approval.
+        // (Admin sets ACTIVE to approve; reject/unpublish should move to INACTIVE.)
+        p.setStatus(PropertyStatus.PENDING_REVIEW);
+        p.setVerified(false);
         p = propertyRepository.save(p);
         log.info(
                 "PROPERTY_CREATED id={} city={} type={} seller={}",

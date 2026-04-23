@@ -121,17 +121,7 @@ public class VisitService {
     }
 
     private boolean isSchedulable(Property property) {
-        if (property.getStatus() == PropertyStatus.ACTIVE) {
-            return true;
-        }
-        // In local/dev we allow scheduling even before agent verification so the flow can be tested end-to-end.
-        boolean local = Arrays.asList(environment.getActiveProfiles()).contains("local");
-        if (!local) {
-            return false;
-        }
-        return property.getStatus() == PropertyStatus.NEW
-                || property.getStatus() == PropertyStatus.PENDING_REVIEW
-                || property.getStatus() == PropertyStatus.ACTIVE;
+        return property.getStatus() == PropertyStatus.ACTIVE;
     }
 
     @Transactional(readOnly = true)

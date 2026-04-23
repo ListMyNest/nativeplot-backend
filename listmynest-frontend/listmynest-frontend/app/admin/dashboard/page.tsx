@@ -21,7 +21,7 @@ import { showToast } from "../../../lib/toast";
 import { PhoneDigitsField } from "../../../components/ui/PhoneDigitsField";
 import { ApiError } from "../../../lib/api";
 
-type Tab = "listings" | "visits" | "agents" | "sellers";
+type Tab = "listings" | "visits" | "sellers";
 
 function humanizeAdminCreateError(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) return fallback;
@@ -65,6 +65,7 @@ export default function AdminDashboardPage() {
   const [sellerName, setSellerName] = useState("");
   const [sellerDigits, setSellerDigits] = useState("");
   const [sellerPassword, setSellerPassword] = useState("");
+  const [sellerPreferredAgentId, setSellerPreferredAgentId] = useState("");
 
   useEffect(() => {
     hydrateFromStorage();
@@ -140,6 +141,12 @@ export default function AdminDashboardPage() {
     if (tab === "sellers") void loadSellers();
     if (tab === "visits") void loadVisits();
   }, [tab, token, role, loadAgents, loadSellers, loadVisits]);
+
+  useEffect(() => {
+    if (!token || String(role).toUpperCase() !== "ADMIN") return;
+    // Seller creation needs agent list (for assigning preferred agent).
+    if (tab === "sellers") void loadAgents();
+  }, [tab, token, role, loadAgents]);
 
   const onActivate = async (id: string) => {
     try {
@@ -235,11 +242,13 @@ export default function AdminDashboardPage() {
         name: sellerName.trim(),
         phone: digitsToIndiaE164(sellerDigits),
         password: sellerPassword,
+        preferredAgentId: sellerPreferredAgentId || null,
       });
       showToast("Seller created.", "success");
       setSellerName("");
       setSellerDigits("");
       setSellerPassword("");
+      setSellerPreferredAgentId("");
       await loadSellers();
     } catch (err) {
       showToast(
@@ -265,7 +274,6 @@ export default function AdminDashboardPage() {
             [
               ["listings", "Listings"],
               ["visits", "Visits"],
-              ["agents", "Agents"],
               ["sellers", "Sellers"],
             ] as const
           ).map(([k, label]) => (
@@ -426,74 +434,6 @@ export default function AdminDashboardPage() {
           </div>
         ) : null}
 
-        {tab === "agents" ? (
-          <div className="mt-4 space-y-6">
-            <form
-              className="rounded-xl bg-white p-4 shadow-sm"
-              onSubmit={(e) => void onCreateAgent(e)}
-            >
-              <h2 className="font-extrabold">Create agent</h2>
-              <p className="mb-3 text-xs text-[#7B6E62]">
-                +91 is fixed; enter 10 digits only (same as seller login).
-              </p>
-              <input
-                required
-                placeholder="Name"
-                className="mb-2 w-full rounded-lg border px-3 py-2"
-                value={agentName}
-                onChange={(e) => setAgentName(e.target.value)}
-              />
-              <div className="mb-2">
-                <PhoneDigitsField
-                  id="admin-agent-phone"
-                  label="Mobile"
-                  value={agentDigits}
-                  onChange={setAgentDigits}
-                />
-              </div>
-              <div className="mb-2">
-                <PhoneDigitsField
-                  id="admin-agent-wa"
-                  label="WhatsApp (optional, else same as mobile)"
-                  value={agentWaDigits}
-                  onChange={setAgentWaDigits}
-                />
-              </div>
-              <input
-                required
-                placeholder="Cities comma-separated"
-                className="mb-2 w-full rounded-lg border px-3 py-2"
-                value={agentCities}
-                onChange={(e) => setAgentCities(e.target.value)}
-              />
-              <input
-                required
-                placeholder="Password"
-                type="password"
-                className="mb-2 w-full rounded-lg border px-3 py-2"
-                value={agentPassword}
-                onChange={(e) => setAgentPassword(e.target.value)}
-              />
-              <button
-                type="submit"
-                className="w-full rounded-xl bg-[#C0392B] py-3 font-semibold text-white"
-              >
-                Create
-              </button>
-            </form>
-            <ul className="space-y-2">
-              {agents.map((a) => (
-                <li
-                  key={String(a.id)}
-                  className="rounded-lg bg-white p-3 text-sm shadow-sm"
-                >
-                  {String(a.name ?? "")} · {String(a.phone ?? "")}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
         {tab === "sellers" ? (
           <div className="mt-4 space-y-6">
             <form
@@ -508,6 +448,21 @@ export default function AdminDashboardPage() {
                 value={sellerName}
                 onChange={(e) => setSellerName(e.target.value)}
               />
+              <label className="mb-2 block text-xs font-semibold text-[#7B6E62]">
+                Assign agent (optional)
+                <select
+                  className="mt-1 w-full rounded-lg border bg-white px-3 py-2"
+                  value={sellerPreferredAgentId}
+                  onChange={(e) => setSellerPreferredAgentId(e.target.value)}
+                >
+                  <option value="">No agent</option>
+                  {agents.map((a) => (
+                    <option key={String(a.id)} value={String(a.id)}>
+                      {String(a.name ?? "")}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <div className="mb-2">
                 <PhoneDigitsField
                   id="admin-seller-phone"
