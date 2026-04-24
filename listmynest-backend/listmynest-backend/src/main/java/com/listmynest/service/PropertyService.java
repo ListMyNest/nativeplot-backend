@@ -107,7 +107,13 @@ public class PropertyService {
         int s = Math.min(100, Math.max(1, size));
         Page<Property> result = propertyRepository.findAll(
                 spec,
-                PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "viewCount").and(Sort.by(Sort.Direction.DESC, "createdAt")))
+                // Home should surface newly-approved listings; use recency first.
+                PageRequest.of(
+                        p,
+                        s,
+                        Sort.by(Sort.Direction.DESC, "createdAt")
+                                .and(Sort.by(Sort.Direction.DESC, "viewCount"))
+                )
         );
         List<PublicPropertyDTO> content =
                 result.getContent().stream().map(propertyListingAssembler::toPublicDto).toList();
