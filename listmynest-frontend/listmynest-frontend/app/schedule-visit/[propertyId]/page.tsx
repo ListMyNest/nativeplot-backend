@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { PropertyRemoteImage } from "../../../components/property/PropertyRemoteImage";
 import { getPropertyDetail, scheduleVisit } from "../../../lib/api";
-import { formatPriceRangeLakh } from "../../../lib/utils/formatPrice";
+import { formatBuyerPriceRange } from "../../../lib/utils/formatPrice";
 import type { PropertyDetail } from "../../../types";
 import { Skeleton } from "../../../components/ui/Skeleton";
 import { Button } from "../../../components/ui/Button";
@@ -129,7 +129,11 @@ export default function ScheduleVisitPage() {
 
   const telHref = callTelFromEnv();
   const priceLine = property
-    ? formatPriceRangeLakh(property.price_min, property.price_max)
+    ? formatBuyerPriceRange(
+        property.price_min,
+        property.price_max,
+        property.type
+      )
     : "";
   const displayId = property?.property_code?.trim() || property?.id || "—";
 

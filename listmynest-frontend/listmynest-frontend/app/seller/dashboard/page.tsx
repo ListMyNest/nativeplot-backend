@@ -14,10 +14,11 @@ import {
   getSellerVisits,
   toAbsoluteAssetUrl,
   updatePropertyStatus,
+  getApiErrorMessage,
 } from "../../../lib/api";
 import { useAuthStore } from "../../../lib/store";
 import { showToast } from "../../../lib/toast";
-import { formatPriceRangeLakh } from "../../../lib/utils/formatPrice";
+import { formatBuyerPriceRange } from "../../../lib/utils/formatPrice";
 import type { PropertyListItem } from "../../../types";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
@@ -41,6 +42,8 @@ function statusBadgeClass(st: string) {
       return "bg-surface2 text-text";
     case "SOLD":
       return "bg-danger/15 text-danger";
+    case "INACTIVE":
+      return "bg-surface2 text-text";
     default:
       return "bg-surface2 text-text";
   }
@@ -120,12 +123,18 @@ export default function SellerDashboardPage() {
   const runStatus = async (id: string, status: string, confirmMsg?: string) => {
     if (confirmMsg && !window.confirm(confirmMsg)) return;
     setActionId(id);
+    const successByStatus: Record<string, string> = {
+      PAUSED: "Listing paused.",
+      ACTIVE: "Listing is live again.",
+      SOLD: "Marked as sold. It will no longer appear in public search.",
+    };
     try {
       await updatePropertyStatus(id, status);
-      showToast("Updated.", "success");
+      showToast(successByStatus[status] ?? "Updated.", "success");
       await loadAll();
-    } catch {
-      showToast("Could not update status.", "error");
+    } catch (e) {
+      const msg = getApiErrorMessage(e, "Could not update status.");
+      showToast(msg, "error");
     } finally {
       setActionId(null);
     }
@@ -265,9 +274,10 @@ export default function SellerDashboardPage() {
           ) : (
             <ul className="grid gap-4 sm:grid-cols-2">
               {listings.map((listing) => {
-                const price = formatPriceRangeLakh(
+                const price = formatBuyerPriceRange(
                   listing.price_min,
-                  listing.price_max
+                  listing.price_max,
+                  listing.type
                 );
                 const st = String(listing.status).toUpperCase();
                 return (
@@ -312,7 +322,7 @@ export default function SellerDashboardPage() {
                         {listing.city}
                       </p>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {st === "ACTIVE" ? (
+                        {st === "ACTIVE" || st === "PENDING_REVIEW" ? (
                           <Button
                             variant="outline"
                             size="sm"
@@ -325,7 +335,7 @@ export default function SellerDashboardPage() {
                             Pause
                           </Button>
                         ) : null}
-                        {st === "PAUSED" ? (
+                        {st === "PAUSED" || st === "INACTIVE" ? (
                           <Button
                             variant="secondary"
                             size="sm"

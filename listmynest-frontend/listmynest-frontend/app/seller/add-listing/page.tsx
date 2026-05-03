@@ -35,12 +35,6 @@ const CONFIGS = [
   { v: "_3BHK", l: "3 BHK" },
 ] as const;
 
-const POSSESSION = [
-  { v: "READY", l: "Available now" },
-  { v: "UNDER_CONSTRUCTION", l: "Under Construction" },
-  { v: "BARE_SHELL", l: "Bare Shell" },
-] as const;
-
 export default function SellerAddListingPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -58,7 +52,6 @@ export default function SellerAddListingPage() {
   const [areaSqft, setAreaSqft] = useState("");
   const [configuration, setConfiguration] = useState("_2BHK");
   const [bathrooms, setBathrooms] = useState(2);
-  const [possession, setPossession] = useState("READY");
   const [description, setDescription] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [primaryIdx, setPrimaryIdx] = useState(0);
@@ -181,13 +174,10 @@ export default function SellerAddListingPage() {
         priceMin: pm,
         priceMax: px,
         areaSqft: ar,
-        ...(showRentHomeDetails ? { configuration } : {}),
-        description: description.trim() || undefined,
         ...(showRentHomeDetails
-          ? { bathrooms, possession: "READY" }
-          : isRentCommercial
-            ? { possession: "READY" }
-            : { possession }),
+          ? { configuration, bathrooms, possession: "READY" }
+          : {}),
+        description: description.trim() || undefined,
       })) as Record<string, unknown>;
       const id = created.id != null ? String(created.id) : "";
       if (id && files.length > 0) {
@@ -447,27 +437,7 @@ export default function SellerAddListingPage() {
                 Commercial rent listings are treated as “Available now”.
               </p>
             </div>
-          ) : (
-            <div>
-              <p className="text-xs font-semibold text-muted">Possession</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {POSSESSION.map((p) => (
-                  <button
-                    key={p.v}
-                    type="button"
-                    onClick={() => setPossession(p.v)}
-                    className={
-                      possession === p.v
-                        ? "min-h-[44px] rounded-full bg-lmn-primary px-4 text-sm font-semibold text-white"
-                        : "min-h-[44px] rounded-full border border-border bg-surface px-4 text-sm font-medium text-text shadow-sm"
-                    }
-                  >
-                    {p.l}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          ) : null}
 
           <label className="block text-xs font-semibold text-muted">
             Description
@@ -521,7 +491,7 @@ export default function SellerAddListingPage() {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {files.map((f, i) => (
                 <div
-                  key={`${f.name}-${i}`}
+                  key={`${f.name}-${f.size}-${f.lastModified}-${i}`}
                   className={
                     primaryIdx === i
                       ? "relative overflow-hidden rounded-xl ring-2 ring-lmn-primary"
@@ -533,11 +503,11 @@ export default function SellerAddListingPage() {
                     onClick={() => setPrimaryIdx(i)}
                     className="block w-full"
                   >
-                    <div className="relative aspect-video w-full bg-surface2">
+                    <div className="relative aspect-video w-full min-h-[88px] bg-surface2">
                       <LocalPreviewImage
                         file={f}
                         alt=""
-                        className="h-full w-full object-cover"
+                        className="absolute inset-0 h-full w-full object-cover"
                       />
                     </div>
                   </button>

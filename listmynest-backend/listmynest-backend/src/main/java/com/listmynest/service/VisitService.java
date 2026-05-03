@@ -8,6 +8,7 @@ import com.listmynest.model.Visit;
 import com.listmynest.model.VisitStatus;
 import com.listmynest.dto.PageResponse;
 import com.listmynest.repository.PropertyRepository;
+import com.listmynest.util.CsvEscapeUtil;
 import com.listmynest.util.LogMaskUtil;
 import com.listmynest.repository.VisitRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -219,13 +220,7 @@ public class VisitService {
     }
 
     private static String csvCell(String raw) {
-        if (raw == null) {
-            return "";
-        }
-        String s = raw.replace("\r\n", "\n").replace('\r', '\n');
-        boolean needsQuotes = s.contains(",") || s.contains("\"") || s.contains("\n");
-        s = s.replace("\"", "\"\"");
-        return needsQuotes ? "\"" + s + "\"" : s;
+        return CsvEscapeUtil.escapeCell(raw);
     }
 
     @Transactional(readOnly = true)

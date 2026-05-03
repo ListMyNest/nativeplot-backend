@@ -23,7 +23,12 @@ import { useAuthStore } from "../../lib/store";
 import { showToast } from "../../lib/toast";
 import { useSessionStore } from "../../store/sessionStore";
 import { digitsToIndiaE164, isTenIndiaDigits } from "../../lib/phone";
-import { formatPriceRangeLakh } from "../../lib/utils/formatPrice";
+import { formatBuyerPriceRange } from "../../lib/utils/formatPrice";
+import {
+  formatBathChipLabel,
+  formatConfigurationLabel,
+  showBuiltStructureMetrics,
+} from "../../lib/utils/propertyDisplay";
 import type { PropertyDetail } from "../../types";
 import { Skeleton } from "../ui/Skeleton";
 import { Button } from "../ui/Button";
@@ -532,7 +537,11 @@ export function PropertyDetailClient({ propertyId }: PropertyDetailClientProps) 
     );
   }
 
-  const priceLine = formatPriceRangeLakh(property.price_min, property.price_max);
+  const priceLine = formatBuyerPriceRange(
+    property.price_min,
+    property.price_max,
+    property.type
+  );
   const statusUpper = String(property.status).toUpperCase();
   const showNewBadge =
     !property.verified &&
@@ -540,10 +549,8 @@ export function PropertyDetailClient({ propertyId }: PropertyDetailClientProps) 
   const codeDisplay =
     property.property_code?.trim() ||
     `LMN-${property.city?.slice(0, 3).toUpperCase() || "BDR"}-${property.id.slice(0, 6)}`;
-  const bath =
-    property.bathrooms != null && property.bathrooms > 0
-      ? `${property.bathrooms} Bath`
-      : "— Bath";
+  const showStructureChips = showBuiltStructureMetrics(property.type);
+  const bathChip = formatBathChipLabel(property.bathrooms);
   const readyLabel =
     property.verified || statusUpper === "ACTIVE"
       ? "Ready"
@@ -706,11 +713,6 @@ export function PropertyDetailClient({ propertyId }: PropertyDetailClientProps) 
         </p>
 
         <div className="mt-3 flex flex-wrap gap-2">
-          {property.verified ? (
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-lmn-verified px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
-              <span aria-hidden>✓</span> Verified
-            </span>
-          ) : null}
           {showNewBadge ? (
             <span className="inline-flex rounded-full bg-amber-400 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-lmn-dark">
               NEW
@@ -722,19 +724,33 @@ export function PropertyDetailClient({ propertyId }: PropertyDetailClientProps) 
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          {[
-            `${property.area_sqft} sqft`,
-            property.configuration || "—",
-            bath,
-            readyLabel,
-          ].map((chip) => (
-            <span
-              key={chip}
-              className="inline-flex rounded-xl bg-lmn-card px-3 py-2 text-xs font-semibold text-lmn-dark ring-1 ring-lmn-border"
-            >
-              {chip}
-            </span>
-          ))}
+          {(() => {
+            const sqftChip =
+              property.area_sqft != null && property.area_sqft > 0
+                ? `${property.area_sqft} sqft`
+                : "— sqft";
+            const chips: { id: string; text: string }[] = [
+              { id: "sqft", text: sqftChip },
+            ];
+            if (showStructureChips) {
+              chips.push({
+                id: "config",
+                text: formatConfigurationLabel(property.configuration),
+              });
+              if (bathChip) {
+                chips.push({ id: "bath", text: bathChip });
+              }
+            }
+            chips.push({ id: "possession", text: readyLabel });
+            return chips.map(({ id, text }) => (
+              <span
+                key={id}
+                className="inline-flex rounded-xl bg-lmn-card px-3 py-2 text-xs font-semibold text-lmn-dark ring-1 ring-lmn-border"
+              >
+                {text}
+              </span>
+            ));
+          })()}
         </div>
 
         <hr className="my-5 border-0 border-t border-lmn-border" />

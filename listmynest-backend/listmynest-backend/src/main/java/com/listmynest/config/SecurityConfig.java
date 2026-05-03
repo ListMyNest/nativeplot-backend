@@ -67,9 +67,11 @@ public class SecurityConfig {
                         auth.requestMatchers("/v3/api-docs/**").permitAll();
                     }
 
-                    auth.requestMatchers(HttpMethod.GET, "/mock-upload/**").permitAll();
-                    auth.requestMatchers(HttpMethod.HEAD, "/mock-upload/**").permitAll();
-                    auth.requestMatchers(HttpMethod.PUT, "/mock-upload/**").permitAll();
+                    if (!prod) {
+                        auth.requestMatchers(HttpMethod.GET, "/mock-upload/**").permitAll();
+                        auth.requestMatchers(HttpMethod.HEAD, "/mock-upload/**").permitAll();
+                        auth.requestMatchers(HttpMethod.PUT, "/mock-upload/**").permitAll();
+                    }
 
                     auth.requestMatchers(HttpMethod.POST, "/v1/admin/auth/login").permitAll();
                     auth.requestMatchers(HttpMethod.POST, "/v1/admin/auth/register").permitAll();
@@ -77,6 +79,7 @@ public class SecurityConfig {
                     auth.requestMatchers("/v1/saved/**").hasRole("BUYER");
                     auth.requestMatchers("/v1/sellers/**").hasRole("SELLER");
                     auth.requestMatchers(HttpMethod.POST, "/v1/properties").hasRole("SELLER");
+                    auth.requestMatchers(HttpMethod.PATCH, "/v1/properties/*/status").hasRole("SELLER");
                     auth.requestMatchers(HttpMethod.PUT, "/v1/properties/**").hasRole("SELLER");
                     auth.requestMatchers("/v1/properties/*/photos").hasRole("SELLER");
                     auth.requestMatchers("/v1/properties/*/photos/**").hasRole("SELLER");

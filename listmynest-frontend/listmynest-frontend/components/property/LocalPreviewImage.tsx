@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
 
 /* eslint-disable @next/next/no-img-element */
+/**
+ * Local file preview. Uses {@link URL.createObjectURL} inside {@link useEffect}
+ * (not {@link useMemo}) so Strict Mode cleanup/revoke does not leave a stale revoked URL on &lt;img&gt;.
+ */
 export function LocalPreviewImage({
   file,
   alt,
@@ -12,20 +16,33 @@ export function LocalPreviewImage({
   alt: string;
   className?: string;
 }) {
-  const url = useMemo(() => URL.createObjectURL(file), [file]);
+  const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {
-    return () => URL.revokeObjectURL(url);
-  }, [url]);
+    const u = URL.createObjectURL(file);
+    setSrc(u);
+    return () => {
+      URL.revokeObjectURL(u);
+    };
+  }, [file]);
+
+  if (!src) {
+    return (
+      <div
+        className={`bg-surface2 animate-pulse ${className ?? ""}`}
+        aria-hidden
+      />
+    );
+  }
 
   return (
     <img
-      src={url}
+      src={src}
       alt={alt}
       className={className}
-      loading="lazy"
+      loading="eager"
+      decoding="async"
       draggable={false}
     />
   );
 }
-

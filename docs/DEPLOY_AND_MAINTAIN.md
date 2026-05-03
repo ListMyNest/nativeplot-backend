@@ -13,9 +13,9 @@ Also read: **`PRODUCTION_DEPLOYMENT.md`** (DB, Nginx, systemd, monitoring) and *
 
 | Item | Action |
 |------|--------|
-| **Secrets** | Set real `JWT_SECRET` (long random), DB password, `SUPABASE_SERVICE_KEY`, Redis URL, `CORS_ALLOWED_ORIGINS` (your HTTPS site origins, comma-separated). Use server env or a protected `application.yml` — **never commit** secrets. |
+| **Secrets** | Set real `JWT_SECRET` (long random), DB password, `SPRING_DATA_REDIS_URL`, `SUPABASE_SERVICE_KEY`, `MSG91_AUTH_KEY` (SMS OTP), `CORS_ALLOWED_ORIGINS` (your HTTPS site origins, comma-separated). If you **do not** use phone OTP in prod, set `LISTMYNEST_AUTH_ALLOW_SMS_DISABLED=true` and use password/Firebase flows only. **Never commit** secrets. |
 | **Default admin** | After first deploy, sign in and **change the password** for the seeded admin (`V16` seed / README). |
-| **API profile** | Run the JAR with **`prod`**: `SPRING_PROFILES_ACTIVE=prod` (or `--spring.profiles.active=prod`). This locks down **Swagger/OpenAPI** and most **actuator** endpoints; only **health** stays public. |
+| **API profile** | Run the JAR with **`prod`**: `SPRING_PROFILES_ACTIVE=prod` (or `--spring.profiles.active=prod`). This locks down **Swagger/OpenAPI** and most **actuator** endpoints; only **health** stays public. In `prod`, `ProdProfileStartupChecks` **fails fast** on placeholder `JWT_SECRET`, blank DB password, placeholder Redis URL, or missing `MSG91_AUTH_KEY` (unless `LISTMYNEST_AUTH_ALLOW_SMS_DISABLED=true`). IP rate limits **fail closed** if Redis is down (`application-prod.yml`). |
 | **CORS** | `CORS_ALLOWED_ORIGINS` must list your real frontend, e.g. `https://www.example.com,https://example.com`. |
 | **TLS** | Terminate HTTPS at **Nginx/Caddy** or your PaaS; do not serve production API over plain HTTP. |
 | **Redis** | Use a **managed Redis** in production (rate limits, caches). |
@@ -82,6 +82,24 @@ Also read: **`PRODUCTION_DEPLOYMENT.md`** (DB, Nginx, systemd, monitoring) and *
 1. In the host (Vercel/Netlify/Node), set environment variables from **`.env.production.example`**, especially `NEXT_PUBLIC_API_BASE_URL`.  
 2. `npm ci && npm run build && npm run start` (or the platform’s build command).  
 3. Open the site over **HTTPS**; verify property pages and login call the **same-origin or correct API** URL in DevTools → Network.
+
+---
+
+## 5a) Docker images (optional)
+
+Dockerfiles live at:
+
+- **API:** `listmynest-backend/listmynest-backend/Dockerfile` (multi-stage: Gradle `bootJar` inside the image).
+- **Web:** `listmynest-frontend/listmynest-frontend/Dockerfile` (`npm run build` + `npm run start`; compatible with `outputFileTracing: false` in `next.config.js`).
+
+Example **Compose** wiring (build args + env file):
+
+```bash
+# Repo root: `.env` must include real JWT, DB, Redis, CORS, and NEXT_PUBLIC_* for the web build.
+docker compose -f deploy/docker-compose.example.yml --env-file .env up --build
+```
+
+`NEXT_PUBLIC_*` values are baked into the frontend at **build** time; rebuild the web image when those URLs change.
 
 ---
 

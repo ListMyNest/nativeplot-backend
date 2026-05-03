@@ -7,7 +7,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Fixed-window rate limiting keyed by caller-supplied Redis key (typically includes client IP).
- * If Redis is unavailable, {@link #allow(String, int, int)} returns {@code true} (fail-open).
+ * If Redis is unavailable, behaviour depends on {@code listmynest.rate-limit.ip.fail-open-on-redis-miss}
+ * (fail-open in dev by default; production config should fail closed).
  */
 @Service
 @RequiredArgsConstructor
@@ -18,6 +19,13 @@ public class IpWindowRateLimiter {
 
     @Value("${listmynest.rate-limit.ip.enabled:true}")
     private boolean enabled;
+
+    /**
+     * When {@code true}, Redis increment failures allow the request (legacy dev behaviour).
+     * Set {@code false} in production so abusive traffic cannot bypass limits when Redis is down.
+     */
+    @Value("${listmynest.rate-limit.ip.fail-open-on-redis-miss:true}")
+    private boolean failOpenOnRedisMiss;
 
     /**
      * @param redisKey full Redis key for this window counter
@@ -31,8 +39,12 @@ public class IpWindowRateLimiter {
         }
         Long c = redisService.increment(redisKey);
         if (c == null) {
-            log.trace("Redis unavailable — skipping IP rate limit for key={}", redisKey);
-            return true;
+            if (failOpenOnRedisMiss) {
+                log.trace("Redis unavailable — skipping IP rate limit for key={}", redisKey);
+                return true;
+            }
+            log.warn("Redis unavailable — blocking request (fail-closed) key={}", redisKey);
+            return false;
         }
         if (c == 1L) {
             redisService.expire(redisKey, windowSeconds);

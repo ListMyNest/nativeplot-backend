@@ -13,7 +13,12 @@ import org.springframework.util.StringUtils;
 
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -54,6 +59,74 @@ public class PropertyListingAssembler {
                 configuration,
                 primaryPhoto,
                 photoCount);
+    }
+
+    /**
+     * Single batched photo query for listing pages (avoids per-row {@code count}/primary lookups).
+     */
+    public List<PublicPropertyDTO> toPublicDtos(List<Property> properties) {
+        if (properties.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> ids = properties.stream().map(Property::getId).toList();
+        Map<UUID, BatchPhotoInfo> agg = loadBatchPhotoInfo(ids);
+        return properties.stream().map(p -> toPublicDtoFromBatch(p, agg.get(p.getId()))).toList();
+    }
+
+    private record BatchPhotoInfo(int photoCount, String primaryPhotoDisplayUrl) {}
+
+    private Map<UUID, BatchPhotoInfo> loadBatchPhotoInfo(List<UUID> propertyIds) {
+        List<PropertyPhoto> photos =
+                propertyPhotoRepository.findAllForListingByPropertyIds(propertyIds);
+        Map<UUID, List<PropertyPhoto>> byProp = new LinkedHashMap<>();
+        for (PropertyPhoto ph : photos) {
+            UUID pid = ph.getProperty().getId();
+            byProp.computeIfAbsent(pid, k -> new ArrayList<>()).add(ph);
+        }
+        Map<UUID, BatchPhotoInfo> out = new HashMap<>();
+        for (UUID id : propertyIds) {
+            List<PropertyPhoto> list = byProp.getOrDefault(id, List.of());
+            out.put(id, new BatchPhotoInfo(list.size(), pickPrimaryDisplayUrl(list)));
+        }
+        return out;
+    }
+
+    private String pickPrimaryDisplayUrl(List<PropertyPhoto> list) {
+        if (list.isEmpty()) {
+            return null;
+        }
+        Optional<PropertyPhoto> primary =
+                list.stream().filter(ph -> Boolean.TRUE.equals(ph.getIsPrimary())).findFirst();
+        if (primary.isPresent()) {
+            return toDisplayUrl(primary.get().getStorageUrl());
+        }
+        List<PropertyPhoto> sorted = new ArrayList<>(list);
+        sorted.sort(
+                Comparator.comparing(PropertyPhoto::getSortOrder, Comparator.nullsFirst(Integer::compareTo))
+                        .thenComparing(PropertyPhoto::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())));
+        return toDisplayUrl(sorted.get(0).getStorageUrl());
+    }
+
+    private PublicPropertyDTO toPublicDtoFromBatch(Property p, BatchPhotoInfo info) {
+        BatchPhotoInfo i = info != null ? info : new BatchPhotoInfo(0, null);
+        String configuration =
+                p.getConfiguration() == null ? null : p.getConfiguration().name();
+        return new PublicPropertyDTO(
+                p.getId(),
+                p.getTitle(),
+                p.getType().name(),
+                p.getCity(),
+                p.getLocality(),
+                p.getPriceMin(),
+                p.getPriceMax(),
+                p.getStatus().name(),
+                p.getVerified(),
+                p.getViewCount(),
+                ISO_INSTANT.format(p.getCreatedAt().truncatedTo(ChronoUnit.SECONDS)),
+                p.getAreaSqft(),
+                configuration,
+                i.primaryPhotoDisplayUrl(),
+                i.photoCount());
     }
 
     public PropertyDetailDTO toDetailDto(Property p) {

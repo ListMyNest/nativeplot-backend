@@ -1,7 +1,11 @@
 import Link from "next/link";
 
 import { PropertyRemoteImage } from "./PropertyRemoteImage";
-import { formatPriceRangeLakh } from "../../lib/utils/formatPrice";
+import { formatBuyerPriceRange } from "../../lib/utils/formatPrice";
+import {
+  formatConfigurationLabel,
+  isLandOrAgriculturalType,
+} from "../../lib/utils/propertyDisplay";
 import type { Property } from "../../types";
 
 function typeChipLabel(type: Property["type"]): string {
@@ -12,15 +16,6 @@ function typeChipLabel(type: Property["type"]): string {
   if (t === "COMMERCIAL") return "Commercial";
   if (t === "AGRICULTURAL") return "Agricultural";
   return String(type);
-}
-
-function configLabel(raw: string): string {
-  const u = raw.toUpperCase();
-  if (u === "_1BHK") return "1 BHK";
-  if (u === "_2BHK") return "2 BHK";
-  if (u === "_3BHK") return "3 BHK";
-  if (u === "OPEN") return "Open";
-  return raw || "—";
 }
 
 export type PropertyCardProps = {
@@ -46,10 +41,13 @@ export function PropertyCard({ property }: PropertyCardProps) {
     view_count,
   } = property;
 
-  const priceLine = formatPriceRangeLakh(price_min, price_max);
+  const priceLine = formatBuyerPriceRange(price_min, price_max, type);
   const areaLabel = area_sqft ? `${area_sqft} sqft` : "— sqft";
   const typeLabel = typeChipLabel(type);
-  const bhk = configuration ? configLabel(String(configuration)) : "—";
+  const landLike = isLandOrAgriculturalType(type);
+  const bhk = configuration
+    ? formatConfigurationLabel(String(configuration))
+    : "—";
 
   return (
     <Link
@@ -103,9 +101,11 @@ export function PropertyCard({ property }: PropertyCardProps) {
           <span className="inline-flex rounded-full bg-surface2 px-2 py-1 text-[11px] font-medium text-text ring-1 ring-border">
             {areaLabel}
           </span>
-          <span className="inline-flex rounded-full bg-surface2 px-2 py-1 text-[11px] font-medium text-text ring-1 ring-border">
-            {bhk}
-          </span>
+          {!landLike ? (
+            <span className="inline-flex rounded-full bg-surface2 px-2 py-1 text-[11px] font-medium text-text ring-1 ring-border">
+              {bhk}
+            </span>
+          ) : null}
           <span className="inline-flex rounded-full bg-surface2 px-2 py-1 text-[11px] font-medium text-text ring-1 ring-border">
             {typeLabel}
           </span>

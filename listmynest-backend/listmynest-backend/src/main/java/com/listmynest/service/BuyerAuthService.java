@@ -8,6 +8,7 @@ import com.listmynest.repository.BuyerRepository;
 import com.listmynest.util.LogMaskUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Optional;
 
 @Service
@@ -28,6 +30,7 @@ public class BuyerAuthService {
     private final JwtService jwtService;
     private final BuyerRepository buyerRepository;
     private final MSG91Service msg91Service;
+    private final Environment environment;
 
     @Value("${msg91.auth-key:}")
     private String msg91AuthKey;
@@ -35,10 +38,29 @@ public class BuyerAuthService {
     @Value("${msg91.otp-length:6}")
     private int msg91OtpLength;
 
+    private boolean isProductionProfile() {
+        return Arrays.asList(environment.getActiveProfiles()).contains("prod");
+    }
+
     public void sendBuyerOtp(String phone) {
         String countKey = "buyer_otp_send:" + phone;
-        String existing = redis.get(countKey);
-        int count = existing == null ? 0 : Integer.parseInt(existing);
+        String existing;
+        try {
+            existing = redis.get(countKey);
+        } catch (Exception e) {
+            if (isProductionProfile()) {
+                throw new AppException(503, "REDIS_UNAVAILABLE");
+            }
+            throw e;
+        }
+        int count = 0;
+        if (existing != null) {
+            try {
+                count = Integer.parseInt(existing.trim());
+            } catch (NumberFormatException ignored) {
+                count = 0;
+            }
+        }
         if (count >= 3) {
             log.warn("RATE_LIMIT_HIT phone={} action=BUYER_OTP_SEND", LogMaskUtil.maskPhone(phone));
             throw new AppException(429, "OTP_LIMIT_EXCEEDED");
@@ -47,15 +69,28 @@ public class BuyerAuthService {
         int digits = Math.max(4, Math.min(10, msg91OtpLength));
         String otp = generateNumericOtp(digits);
         String hash = sha256Hex(otp);
-        redis.set("buyer_otp:" + phone, otpJson(hash, 0), 300);
+        try {
+            redis.set("buyer_otp:" + phone, otpJson(hash, 0), 300);
+        } catch (Exception e) {
+            if (isProductionProfile()) {
+                throw new AppException(503, "REDIS_UNAVAILABLE");
+            }
+            throw e;
+        }
 
         Long newCount = redis.increment(countKey);
+        if (isProductionProfile() && newCount == null) {
+            throw new AppException(503, "REDIS_UNAVAILABLE");
+        }
         if (newCount != null && newCount == 1L) {
             redis.expire(countKey, 3600);
         }
 
         boolean devMode = msg91AuthKey == null || msg91AuthKey.isBlank();
         if (devMode) {
+            if (isProductionProfile()) {
+                throw new AppException(503, "SMS_NOT_CONFIGURED");
+            }
             log.warn("MSG91_AUTH_KEY is blank — skipping buyer SMS send (dev mode)");
             log.info(
                     "OTP_SENT phone={} mode=DEV(no_msg91) role=BUYER",
@@ -73,7 +108,15 @@ public class BuyerAuthService {
     @Transactional
     public BuyerAuthResponse verifyBuyerOtp(String phone, String otp) {
         String key = "buyer_otp:" + phone;
-        String raw = redis.get(key);
+        String raw;
+        try {
+            raw = redis.get(key);
+        } catch (Exception e) {
+            if (isProductionProfile()) {
+                throw new AppException(503, "REDIS_UNAVAILABLE");
+            }
+            throw e;
+        }
         if (raw == null) {
             log.warn("OTP_FAILED phone={} reason=OTP_EXPIRED role=BUYER", LogMaskUtil.maskPhone(phone));
             throw new AppException(400, "OTP_EXPIRED");

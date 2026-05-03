@@ -106,6 +106,8 @@ type ApiFetchOptions = Omit<RequestInit, "body"> & {
   auth?: AuthMode;
   /** When true, skip the global toast for HTTP 5xx (caller handles errors). */
   suppressErrorToast?: boolean;
+  /** When true, skip browser console success/error lines (default logs in development only). */
+  suppressDevLog?: boolean;
 };
 
 /** Readable message from {@link ApiError} or generic errors (for inline UI). */
@@ -162,11 +164,19 @@ export async function apiFetch<T = unknown>(
     body,
     auth = "default",
     suppressErrorToast = false,
+    suppressDevLog = false,
     headers: hdrs,
     ...rest
   } = options;
   const token = getBearer(auth);
   const url = `${BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  const shortPath = path.startsWith("/") ? path : `/${path}`;
+  const method = String(rest.method ?? "GET").toUpperCase();
+  const devLog =
+    !suppressDevLog &&
+    typeof process !== "undefined" &&
+    process.env.NODE_ENV === "development" &&
+    typeof window !== "undefined";
 
   const headers: HeadersInit = {
     Accept: "application/json",
@@ -181,7 +191,20 @@ export async function apiFetch<T = unknown>(
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   };
 
-  const res = await fetch(url, init);
+  let res: Response;
+  try {
+    res = await fetch(url, init);
+  } catch (e) {
+    const msg =
+      e instanceof Error ? e.message : "Network request failed";
+    if (devLog) {
+      console.error(`[ListMyNest API] NETWORK ${method} ${shortPath}`, e);
+    }
+    if (!suppressErrorToast) {
+      showToast("Network error. Check connection.", "error");
+    }
+    throw new ApiError(0, null, msg);
+  }
   const text = await res.text();
   let parsed: unknown = text;
   if (text) {
@@ -236,7 +259,19 @@ export async function apiFetch<T = unknown>(
     if (res.status >= 500 && !suppressErrorToast) {
       showToast(msg ?? "Server error. Try again.", "error");
     }
+    if (devLog) {
+      console.error(
+        `[ListMyNest API] FAIL ${method} ${shortPath} → HTTP ${res.status}`,
+        msg ?? parsed
+      );
+    }
     throw new ApiError(res.status, parsed, msg);
+  }
+
+  if (devLog) {
+    console.info(
+      `[ListMyNest API] OK ${method} ${shortPath} → HTTP ${res.status}`
+    );
   }
 
   return parsed as T;

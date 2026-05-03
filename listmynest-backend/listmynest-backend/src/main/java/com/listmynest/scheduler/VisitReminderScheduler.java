@@ -33,7 +33,7 @@ public class VisitReminderScheduler {
     @Transactional(readOnly = true)
     public void sendVisitReminders() {
         long t0 = System.currentTimeMillis();
-        log.info("SCHEDULER_START job={} time={}", JOB, Instant.now());
+        log.trace("SCHEDULER_START job={} time={}", JOB, Instant.now());
         int sent = 0;
         try {
             LocalDate today = LocalDate.now(ZONE);
@@ -68,7 +68,11 @@ public class VisitReminderScheduler {
                 );
             }
             long ms = System.currentTimeMillis() - t0;
-            log.info("SCHEDULER_COMPLETE job={} processed={} duration={}ms", JOB, sent, ms);
+            if (sent > 0) {
+                log.info("SCHEDULER_COMPLETE job={} processed={} duration={}ms", JOB, sent, ms);
+            } else {
+                log.trace("SCHEDULER_COMPLETE job={} processed=0 duration={}ms", JOB, ms);
+            }
         } catch (Exception e) {
             log.error("SCHEDULER_ERROR job={} error={}", JOB, e.getMessage(), e);
         }

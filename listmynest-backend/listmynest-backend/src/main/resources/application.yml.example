@@ -3,6 +3,7 @@
 
 server:
   port: ${SERVER_PORT:8080}
+  shutdown: graceful
   # When behind Nginx/Caddy, trust X-Forwarded-* for client IP (used by IP rate limits).
   forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:framework}
   tomcat:
@@ -13,6 +14,8 @@ server:
     max-connections: ${TOMCAT_MAX_CONNECTIONS:8000}
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: ${SPRING_LIFECYCLE_SHUTDOWN_TIMEOUT:30s}
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://YOUR_DB_HOST:5432/postgres?sslmode=require}
     username: ${SPRING_DATASOURCE_USERNAME:postgres.YOUR_PROJECT_REF}
@@ -92,10 +95,15 @@ listmynest:
     client:
       connect-timeout-ms: ${LISTMYNEST_HTTP_CONNECT_TIMEOUT_MS:5000}
       read-timeout-ms: ${LISTMYNEST_HTTP_READ_TIMEOUT_MS:15000}
+  auth:
+    # Production: MSG91_AUTH_KEY is required unless this is true (password/Firebase-only deployments).
+    allow-sms-disabled: ${LISTMYNEST_AUTH_ALLOW_SMS_DISABLED:false}
   rate-limit:
     ip:
       # Master switch for {@link com.listmynest.config.PublicWriteIpRateLimitFilter}.
       enabled: ${LISTMYNEST_RATE_LIMIT_IP_ENABLED:true}
+      # When false, Redis failures cause 429 instead of allowing traffic (set false in prod).
+      fail-open-on-redis-miss: ${LISTMYNEST_RL_IP_FAIL_OPEN:true}
       post-leads-per-hour: ${LISTMYNEST_RL_IP_LEADS_PER_HOUR:200}
       post-visits-per-hour: ${LISTMYNEST_RL_IP_VISITS_PER_HOUR:120}
       post-notify-me-per-hour: ${LISTMYNEST_RL_IP_NOTIFY_PER_HOUR:40}

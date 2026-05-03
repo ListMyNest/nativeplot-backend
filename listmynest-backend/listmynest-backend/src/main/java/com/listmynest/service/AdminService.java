@@ -37,6 +37,7 @@ import com.listmynest.repository.VisitRepository;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -98,6 +99,11 @@ public class AdminService {
     private final PropertyListingAssembler propertyListingAssembler;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private final Environment environment;
+
+    private boolean isProductionProfile() {
+        return Arrays.asList(environment.getActiveProfiles()).contains("prod");
+    }
 
     @Transactional(readOnly = true)
     public PageResponse<AdminPropertyDTO> getAllProperties(
@@ -385,8 +391,8 @@ public class AdminService {
         if (StringUtils.hasText(admin.getPasswordHash())) {
             ok = passwordEncoder.matches(req.password(), admin.getPasswordHash());
         }
-        if (!ok && "admin123".equals(req.password())) {
-            log.warn("DEV MODE: admin login allowed with hardcoded password for {}", req.email());
+        if (!ok && !isProductionProfile() && "admin123".equals(req.password())) {
+            log.warn("DEV ONLY: admin login allowed with legacy dev password for {}", req.email());
             ok = true;
         }
         if (!ok) {

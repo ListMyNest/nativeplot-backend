@@ -4,7 +4,12 @@
 # Start the API with: --spring.profiles.active=prod
 # or: SPRING_PROFILES_ACTIVE=prod
 
+server:
+  shutdown: graceful
+
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: ${SPRING_LIFECYCLE_SHUTDOWN_TIMEOUT:30s}
   jpa:
     show-sql: false
 
@@ -29,3 +34,15 @@ management:
   health:
     defaults:
       enabled: true
+
+# Hardening defaults (override only with intent).
+listmynest:
+  logging:
+    stack-traces-for-all-errors: false
+  auth:
+    # Set LISTMYNEST_AUTH_ALLOW_SMS_DISABLED=true only if phone OTP is disabled (password/Firebase-only).
+    allow-sms-disabled: ${LISTMYNEST_AUTH_ALLOW_SMS_DISABLED:false}
+  rate-limit:
+    ip:
+      # Block requests when Redis cannot increment counters (recommended for production).
+      fail-open-on-redis-miss: ${LISTMYNEST_RL_IP_FAIL_OPEN:false}

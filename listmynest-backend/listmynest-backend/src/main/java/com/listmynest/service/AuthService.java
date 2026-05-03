@@ -14,6 +14,7 @@ import com.listmynest.repository.SellerRepository;
 import com.listmynest.util.LogMaskUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,6 +44,7 @@ public class AuthService {
     private final SellerRepository sellerRepository;
     private final MSG91Service msg91Service;
     private final PasswordEncoder passwordEncoder;
+    private final Environment environment;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private FirebaseApp firebaseApp;
@@ -52,8 +55,12 @@ public class AuthService {
     @Value("${msg91.otp-length:6}")
     private int msg91OtpLength;
 
+    private boolean isProductionProfile() {
+        return Arrays.asList(environment.getActiveProfiles()).contains("prod");
+    }
+
     /**
-     * @return OTP plaintext in dev mode (MSG91 disabled) for UI/testing; otherwise {@code null}
+     * @return OTP plaintext when MSG91 is disabled (non-prod only); otherwise {@code null}
      */
     public String sendOtp(String phone) {
         String countKey = "otp_send_count:" + phone;
@@ -63,9 +70,12 @@ public class AuthService {
         try {
             existing = redis.get(countKey);
         } catch (Exception e) {
-            log.warn("Redis unavailable - running in no-cache dev mode");
+            log.warn("Redis unavailable - OTP counter: {}", e.getMessage());
+            if (isProductionProfile()) {
+                throw new AppException(503, "REDIS_UNAVAILABLE");
+            }
         }
-        if (existing == null) {
+        if (existing == null && !isProductionProfile()) {
             existing = localOtpFallback.get(countKey);
         }
         int count = parseCount(existing);
@@ -82,23 +92,41 @@ public class AuthService {
         try {
             redis.set(otpKey, payload, 300);
         } catch (Exception e) {
-            log.warn("Redis unavailable - running in no-cache dev mode");
+            log.warn("Redis unavailable for OTP storage: {}", e.getMessage());
+            if (isProductionProfile()) {
+                throw new AppException(503, "REDIS_UNAVAILABLE");
+            }
             localOtpFallback.put(otpKey, payload);
         }
 
+        Long newCount;
         try {
-            Long newCount = redis.increment(countKey);
+            newCount = redis.increment(countKey);
             if (newCount != null && newCount == 1L) {
                 redis.expire(countKey, 3600);
             }
         } catch (Exception e) {
-            log.warn("Redis unavailable - running in no-cache dev mode");
+            log.warn("Redis unavailable for OTP rate counter: {}", e.getMessage());
+            if (isProductionProfile()) {
+                throw new AppException(503, "REDIS_UNAVAILABLE");
+            }
+            newCount = null;
+            int next = count + 1;
+            localOtpFallback.put(countKey, String.valueOf(next));
+        }
+        if (isProductionProfile() && newCount == null) {
+            throw new AppException(503, "REDIS_UNAVAILABLE");
+        }
+        if (!isProductionProfile() && newCount == null) {
             int next = count + 1;
             localOtpFallback.put(countKey, String.valueOf(next));
         }
 
         boolean devMode = msg91AuthKey == null || msg91AuthKey.isBlank();
         if (devMode) {
+            if (isProductionProfile()) {
+                throw new AppException(503, "SMS_NOT_CONFIGURED");
+            }
             log.warn("MSG91_AUTH_KEY is blank — skipping SMS send (dev mode)");
             log.info(
                     "OTP_SENT phone={} mode=DEV(no_msg91) devOtpReturnedToClient=true",
@@ -121,9 +149,12 @@ public class AuthService {
         try {
             raw = redis.get(key);
         } catch (Exception e) {
-            log.warn("Redis unavailable - running in no-cache dev mode");
+            log.warn("Redis unavailable for OTP verify: {}", e.getMessage());
+            if (isProductionProfile()) {
+                throw new AppException(503, "REDIS_UNAVAILABLE");
+            }
         }
-        if (raw == null) {
+        if (raw == null && !isProductionProfile()) {
             raw = localOtpFallback.get(key);
         }
         if (raw == null) {
@@ -146,14 +177,18 @@ public class AuthService {
                 Long ttl = redis.getExpireSeconds(key);
                 seconds = ttl == null || ttl <= 0 ? 300 : ttl;
             } catch (Exception e) {
-                log.warn("Redis unavailable - running in no-cache dev mode");
+                if (isProductionProfile()) {
+                    throw new AppException(503, "REDIS_UNAVAILABLE");
+                }
                 seconds = 300;
             }
             String updated = otpJson(storedHash != null ? storedHash : "", next);
             try {
                 redis.set(key, updated, seconds);
             } catch (Exception e) {
-                log.warn("Redis unavailable - running in no-cache dev mode");
+                if (isProductionProfile()) {
+                    throw new AppException(503, "REDIS_UNAVAILABLE");
+                }
                 localOtpFallback.put(key, updated);
             }
             log.warn(
@@ -167,7 +202,9 @@ public class AuthService {
         try {
             redis.delete(key);
         } catch (Exception e) {
-            log.warn("Redis unavailable - running in no-cache dev mode");
+            if (isProductionProfile()) {
+                log.warn("Redis delete after OTP verify failed: {}", e.getMessage());
+            }
         }
         localOtpFallback.remove(key);
 

@@ -104,7 +104,7 @@ public class PropertyService {
                 PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "createdAt"))
         );
         List<PublicPropertyDTO> content =
-                result.getContent().stream().map(propertyListingAssembler::toPublicDto).toList();
+                propertyListingAssembler.toPublicDtos(result.getContent());
         PageResponse<PublicPropertyDTO> out = new PageResponse<>(content, result.getNumber(), result.getSize(), result.getTotalElements());
         writePublicListingCache(cacheKey, out);
         return out;
@@ -150,7 +150,7 @@ public class PropertyService {
                 PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "createdAt"))
         );
         List<PublicPropertyDTO> content =
-                result.getContent().stream().map(propertyListingAssembler::toPublicDto).toList();
+                propertyListingAssembler.toPublicDtos(result.getContent());
         PageResponse<PublicPropertyDTO> out = new PageResponse<>(content, result.getNumber(), result.getSize(), result.getTotalElements());
         writePublicListingCache(cacheKey, out);
         return out;
@@ -188,7 +188,7 @@ public class PropertyService {
                 )
         );
         List<PublicPropertyDTO> content =
-                result.getContent().stream().map(propertyListingAssembler::toPublicDto).toList();
+                propertyListingAssembler.toPublicDtos(result.getContent());
         PageResponse<PublicPropertyDTO> out = new PageResponse<>(content, result.getNumber(), result.getSize(), result.getTotalElements());
         writePublicListingCache(cacheKey, out);
         return out;

@@ -76,7 +76,8 @@ public class RedisService {
             Set<String> keys = redisTemplate.keys(pattern);
             return keys != null ? keys : Collections.emptySet();
         } catch (Exception e) {
-            log.error("Redis scan failed for pattern {}: {}", pattern, e.getMessage());
+            // Redis optional locally; avoid ERROR spam every scheduler tick when Redis is down.
+            log.debug("Redis scan skipped pattern={}: {}", pattern, e.toString());
             return Collections.emptySet();
         }
     }

@@ -2,12 +2,16 @@ package com.listmynest.controller;
 
 import com.listmynest.dto.CreatePropertyRequest;
 import com.listmynest.dto.CreatePropertyResponse;
+import com.listmynest.dto.PublicPropertyDTO;
+import com.listmynest.dto.UpdatePropertyStatusRequest;
 import com.listmynest.exception.AppException;
 import com.listmynest.service.SellerPropertyService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,6 +30,14 @@ public class SellerPropertyController {
     public CreatePropertyResponse create(@Valid @RequestBody CreatePropertyRequest body) {
         UUID id = sellerPropertyService.create(body, currentSellerId());
         return new CreatePropertyResponse(id);
+    }
+
+    @PatchMapping("/{id}/status")
+    public PublicPropertyDTO updateStatus(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdatePropertyStatusRequest body
+    ) {
+        return sellerPropertyService.updateListingStatus(currentSellerId(), id, body.status());
     }
 
     private static UUID currentSellerId() {

@@ -29,23 +29,43 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
   enabled: process.env.ANALYZE === "true",
 });
 
+const isProdBuild = process.env.NODE_ENV === "production";
+
 const nextConfig = {
   // Fix Windows/OneDrive EPERM on `.next/trace` by disabling file tracing.
   outputFileTracing: false,
   /** Baseline security headers for production deployments (complement TLS at CDN/reverse proxy). */
   async headers() {
+    const securityHeaders = [
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      {
+        key: "Permissions-Policy",
+        value: "camera=(), microphone=(), geolocation=()",
+      },
+      ...(isProdBuild
+        ? [
+            {
+              key: "Strict-Transport-Security",
+              value: "max-age=31536000; includeSubDomains; preload",
+            },
+          ]
+        : []),
+      {
+        key: "Content-Security-Policy",
+        value:
+          "default-src 'self'; base-uri 'self'; frame-ancestors 'self'; object-src 'none'; " +
+          "img-src 'self' data: https: blob:; font-src 'self' data: https:; " +
+          "style-src 'self' 'unsafe-inline' https:; " +
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; " +
+          "connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:*;",
+      },
+    ];
     return [
       {
         source: "/:path*",
-        headers: [
-          { key: "X-Frame-Options", value: "SAMEORIGIN" },
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          {
-            key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
-          },
-        ],
+        headers: securityHeaders,
       },
     ];
   },

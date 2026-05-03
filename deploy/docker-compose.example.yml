@@ -1,0 +1,33 @@
+# Example: API + Next.js on one host (development / small prod pilot).
+#
+# From repo root (with `.env` filled from `.env.example` / backend `application.yml.example`):
+#   docker compose -f deploy/docker-compose.example.yml --env-file .env up --build
+#
+# The API runs with profile `prod` and fails fast on placeholder JWT / blank DB password.
+# Frontend needs NEXT_PUBLIC_* at image build time — set them in `.env` so Compose can pass build args.
+
+services:
+  listmynest-api:
+    build:
+      context: ../listmynest-backend/listmynest-backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - ../.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+
+  listmynest-web:
+    build:
+      context: ../listmynest-frontend/listmynest-frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID}
+    ports:
+      - "3000:3000"

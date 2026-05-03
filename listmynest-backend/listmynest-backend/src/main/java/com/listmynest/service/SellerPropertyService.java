@@ -1,6 +1,7 @@
 package com.listmynest.service;
 
 import com.listmynest.dto.CreatePropertyRequest;
+import com.listmynest.dto.PublicPropertyDTO;
 import com.listmynest.exception.AppException;
 import com.listmynest.model.Configuration;
 import com.listmynest.model.Possession;
@@ -18,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -32,6 +33,7 @@ public class SellerPropertyService {
     private final SellerRepository sellerRepository;
     private final Environment environment;
     private final GeocodingService geocodingService;
+    private final PropertyListingAssembler propertyListingAssembler;
 
     @Transactional
     public UUID create(CreatePropertyRequest req, UUID sellerId) {
@@ -121,6 +123,66 @@ public class SellerPropertyService {
                 sellerId
         );
         return p.getId();
+    }
+
+    /**
+     * Seller may set {@link PropertyStatus#ACTIVE}, {@link PropertyStatus#PAUSED}, or {@link PropertyStatus#SOLD}.
+     * Cannot modify {@link PropertyStatus#SOLD} or {@link PropertyStatus#ARCHIVED} listings.
+     */
+    @Transactional
+    public PublicPropertyDTO updateListingStatus(UUID sellerId, UUID propertyId, String statusStr) {
+        Property property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new AppException(404, "PROPERTY_NOT_FOUND"));
+        if (property.getSeller() == null || !property.getSeller().getId().equals(sellerId)) {
+            throw new AppException(403, "FORBIDDEN");
+        }
+        PropertyStatus next;
+        try {
+            next = PropertyStatus.valueOf(statusStr.trim().toUpperCase());
+        } catch (Exception e) {
+            throw new AppException(400, "INVALID_STATUS");
+        }
+        PropertyStatus cur = property.getStatus();
+        validateSellerStatusTransition(cur, next);
+        PropertyStatus prev = cur;
+        property.setStatus(next);
+        if (next == PropertyStatus.SOLD) {
+            property.setSoldAt(Instant.now());
+        }
+        if (next == PropertyStatus.ACTIVE) {
+            property.setLastActivityAt(Instant.now());
+        }
+        propertyRepository.save(property);
+        log.info(
+                "SELLER_PROPERTY_STATUS propertyId={} sellerId={} from={} to={}",
+                propertyId,
+                sellerId,
+                prev.name(),
+                next.name()
+        );
+        return propertyListingAssembler.toPublicDto(property);
+    }
+
+    private static void validateSellerStatusTransition(PropertyStatus cur, PropertyStatus next) {
+        if (cur == PropertyStatus.SOLD || cur == PropertyStatus.ARCHIVED) {
+            throw new AppException(400, "STATUS_IMMUTABLE");
+        }
+        switch (next) {
+            case ACTIVE -> {
+                if (cur != PropertyStatus.PAUSED && cur != PropertyStatus.INACTIVE) {
+                    throw new AppException(400, "INVALID_STATUS_TRANSITION");
+                }
+            }
+            case PAUSED -> {
+                if (cur != PropertyStatus.ACTIVE && cur != PropertyStatus.PENDING_REVIEW) {
+                    throw new AppException(400, "INVALID_STATUS_TRANSITION");
+                }
+            }
+            case SOLD -> {
+                // allowed from any non-terminal state
+            }
+            default -> throw new AppException(400, "SELLER_CANNOT_SET_STATUS");
+        }
     }
 }
 

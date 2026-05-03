@@ -26,7 +26,7 @@ public class ViewCountFlushScheduler {
     @Transactional
     public void flushViewCounts() {
         long t0 = System.currentTimeMillis();
-        log.info("SCHEDULER_START job={} time={}", JOB, Instant.now());
+        log.trace("SCHEDULER_START job={} time={}", JOB, Instant.now());
         try {
             int flushed = 0;
             for (String key : redisService.scanKeys(PREFIX + "*")) {
@@ -58,10 +58,14 @@ public class ViewCountFlushScheduler {
                 propertyRepository.incrementViewCount(propertyId, count);
                 redisService.delete(key);
                 flushed++;
-                log.warn("SCHEDULER_ACTION job={} property={} action=FLUSH_VIEW_COUNT delta={}", JOB, propertyId, count);
+                log.info("SCHEDULER_ACTION job={} property={} action=FLUSH_VIEW_COUNT delta={}", JOB, propertyId, count);
             }
             long ms = System.currentTimeMillis() - t0;
-            log.info("SCHEDULER_COMPLETE job={} processed={} duration={}ms", JOB, flushed, ms);
+            if (flushed > 0) {
+                log.info("SCHEDULER_COMPLETE job={} processed={} duration={}ms", JOB, flushed, ms);
+            } else {
+                log.trace("SCHEDULER_COMPLETE job={} processed=0 duration={}ms", JOB, ms);
+            }
         } catch (Exception e) {
             log.error("SCHEDULER_ERROR job={} error={}", JOB, e.getMessage(), e);
         }

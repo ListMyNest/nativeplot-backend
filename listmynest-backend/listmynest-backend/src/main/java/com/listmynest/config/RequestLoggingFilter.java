@@ -6,12 +6,15 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.UUID;
 
 /**
- * Logs inbound HTTP requests and responses with duration. Skips noisy health and OpenAPI paths.
+ * Logs each HTTP operation with a short correlation id ({@code rid} in MDC / log pattern).
+ * Success → INFO; client/server errors → WARN with status for quick scanning.
  */
 @Slf4j
 public class RequestLoggingFilter extends OncePerRequestFilter {
@@ -28,18 +31,29 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             return;
         }
 
+        String rid = UUID.randomUUID().toString().substring(0, 8);
+        MDC.put("rid", rid);
+
         String method = request.getMethod();
         String maskedPath = LogMaskUtil.maskDigitsInPath(path);
         String ip = clientIp(request);
         long size = request.getContentLengthLong();
         long start = System.currentTimeMillis();
-        log.info("REQUEST {} {} from {} size={}bytes", method, maskedPath, ip, size);
+        log.info("HTTP_BEGIN {} {} ip={} bytes={}", method, maskedPath, ip, size);
 
         try {
             filterChain.doFilter(request, response);
         } finally {
             long ms = System.currentTimeMillis() - start;
-            log.info("RESPONSE {} {} status={} duration={}ms", method, maskedPath, response.getStatus(), ms);
+            int status = response.getStatus();
+            if (status >= 500) {
+                log.warn("HTTP_END {} {} status={} duration={}ms", method, maskedPath, status, ms);
+            } else if (status >= 400) {
+                log.warn("HTTP_END {} {} status={} duration={}ms (client or auth error — see exception logs above)", method, maskedPath, status, ms);
+            } else {
+                log.info("HTTP_END {} {} status={} duration={}ms", method, maskedPath, status, ms);
+            }
+            MDC.remove("rid");
         }
     }
 
