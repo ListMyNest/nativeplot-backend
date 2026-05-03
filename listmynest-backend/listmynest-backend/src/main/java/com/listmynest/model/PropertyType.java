@@ -4,5 +4,7 @@ public enum PropertyType {
     RESIDENTIAL,
     PLOT,
     COMMERCIAL,
-    AGRICULTURAL
+    AGRICULTURAL,
+    RENT_HOME,
+    RENT_COMMERCIAL
 }

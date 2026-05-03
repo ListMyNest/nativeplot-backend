@@ -26,18 +26,18 @@ export function BottomSheet({ open, onClose, title, children }: Props) {
     <div className="fixed inset-0 z-[100] flex flex-col justify-end">
       <button
         type="button"
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
         aria-label="Close"
         onClick={onClose}
       />
       <div
-        className="relative max-h-[85dvh] overflow-y-auto rounded-t-3xl bg-white px-4 pb-8 pt-2 shadow-xl"
+        className="relative max-h-[85dvh] overflow-y-auto rounded-t-3xl border-2 border-border bg-surface px-4 pb-8 pt-2 shadow-xl"
         role="dialog"
         aria-modal="true"
       >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-lmn-border" />
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
         {title ? (
-          <h2 className="mb-4 text-center text-lg font-extrabold text-lmn-dark">
+          <h2 className="mb-4 text-center text-lg font-extrabold text-text">
             {title}
           </h2>
         ) : null}

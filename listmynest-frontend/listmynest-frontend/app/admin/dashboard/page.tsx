@@ -5,23 +5,129 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { AppDashboardChrome } from "../../../components/layout/AppDashboardChrome";
+import { Download } from "lucide-react";
+
 import {
   adminActivateListing,
   adminCreateAgent,
   adminCreateSeller,
+  adminDownloadVisitsCsv,
   adminGetAgents,
   adminGetProperties,
   adminGetSellers,
   adminGetVisits,
   adminRejectListing,
+  adminUpdateVisitStatus,
+  ApiError,
+  getApiErrorMessage,
 } from "../../../lib/api";
 import { digitsToIndiaE164, isTenIndiaDigits } from "../../../lib/phone";
 import { useAuthStore } from "../../../lib/store";
 import { showToast } from "../../../lib/toast";
 import { PhoneDigitsField } from "../../../components/ui/PhoneDigitsField";
-import { ApiError } from "../../../lib/api";
 
-type Tab = "listings" | "visits" | "sellers";
+type Tab = "listings" | "visits" | "sellers" | "agents";
+
+/** Keeps skeleton visible briefly so fast networks still see layout feedback. */
+const MIN_SKELETON_MS = 420;
+
+function sleep(ms: number) {
+  return new Promise<void>((r) => setTimeout(r, ms));
+}
+
+function ymdLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function defaultVisitExportRange(): { from: string; to: string } {
+  const to = new Date();
+  const from = new Date(to);
+  from.setDate(from.getDate() - 30);
+  return { from: ymdLocal(from), to: ymdLocal(to) };
+}
+
+function AdminListingsSkeleton({
+  rows = 5,
+  className = "mt-4",
+}: {
+  rows?: number;
+  className?: string;
+}) {
+  return (
+    <ul className={`${className} space-y-3`.trim()} aria-hidden>
+      {Array.from({ length: rows }, (_, i) => (
+        <li
+          key={i}
+          className="rounded-2xl border border-[#D2C6BC] bg-[#EDE4DC] p-4 shadow-sm"
+        >
+          <div className="h-4 w-[min(72%,280px)] rounded-lg bg-[#C9B8A8] animate-pulse" />
+          <div className="mt-3 h-3 w-[min(40%,160px)] rounded-md bg-[#BFB0A0] animate-pulse" />
+          <div className="mt-4 flex gap-2">
+            <div className="h-9 w-24 rounded-xl bg-[#B5A696] animate-pulse" />
+            <div className="h-9 w-20 rounded-xl bg-[#B5A696] animate-pulse" />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function AdminVisitsSkeleton({
+  rows = 4,
+  className = "mt-5",
+}: {
+  rows?: number;
+  className?: string;
+}) {
+  return (
+    <div className={`${className} space-y-3`.trim()} aria-hidden>
+      {Array.from({ length: rows }, (_, i) => (
+        <div
+          key={i}
+          className="rounded-2xl border border-[#D2C6BC] bg-[#EDE4DC] p-4 shadow-sm md:p-5"
+        >
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-4 w-[min(85%,320px)] rounded-lg bg-[#C9B8A8] animate-pulse" />
+              <div className="h-3 w-[min(60%,240px)] rounded-md bg-[#BFB0A0] animate-pulse" />
+              <div className="h-6 w-24 rounded-full bg-[#B5A696] animate-pulse" />
+            </div>
+            <div className="flex shrink-0 gap-2 md:flex-col md:items-end">
+              <div className="h-10 w-32 rounded-xl bg-[#B5A696] animate-pulse" />
+              <div className="h-10 w-28 rounded-xl bg-[#B5A696] animate-pulse" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function visitStatusBadgeClass(status: string): string {
+  const u = status.toUpperCase();
+  if (u === "VISITED") {
+    return "bg-emerald-100 text-emerald-900 ring-1 ring-emerald-200";
+  }
+  if (u === "CANCELLED") {
+    return "bg-stone-200 text-stone-700 ring-1 ring-stone-300";
+  }
+  if (u === "NOT_VISITED") {
+    return "bg-amber-100 text-amber-950 ring-1 ring-amber-200";
+  }
+  return "bg-sky-100 text-sky-950 ring-1 ring-sky-200";
+}
+
+function canMarkVisitCompleted(status: string): boolean {
+  const u = status.toUpperCase();
+  return ["SCHEDULED", "CONFIRMED", "RESCHEDULED", "NOT_VISITED"].includes(u);
+}
+
+function canMarkVisitPending(status: string): boolean {
+  return status.toUpperCase() === "VISITED";
+}
 
 function humanizeAdminCreateError(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) return fallback;
@@ -54,7 +160,17 @@ export default function AdminDashboardPage() {
   const [visitPage, setVisitPage] = useState(0);
   const [visitTotal, setVisitTotal] = useState(0);
   const [visitSize] = useState(30);
-  const [loading, setLoading] = useState(false);
+  const [listingsLoading, setListingsLoading] = useState(false);
+  const [visitsLoading, setVisitsLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [visitUpdatingId, setVisitUpdatingId] = useState<string | null>(null);
+  const [visitExportFrom, setVisitExportFrom] = useState(
+    () => defaultVisitExportRange().from
+  );
+  const [visitExportTo, setVisitExportTo] = useState(
+    () => defaultVisitExportRange().to
+  );
+  const [visitExporting, setVisitExporting] = useState(false);
 
   const [agentName, setAgentName] = useState("");
   const [agentDigits, setAgentDigits] = useState("");
@@ -66,6 +182,7 @@ export default function AdminDashboardPage() {
   const [sellerDigits, setSellerDigits] = useState("");
   const [sellerPassword, setSellerPassword] = useState("");
   const [sellerPreferredAgentId, setSellerPreferredAgentId] = useState("");
+  const [sellerIsAgent, setSellerIsAgent] = useState(false);
 
   useEffect(() => {
     hydrateFromStorage();
@@ -78,7 +195,8 @@ export default function AdminDashboardPage() {
   }, [token, role, router]);
 
   const loadListings = useCallback(async () => {
-    setLoading(true);
+    const t0 = Date.now();
+    setListingsLoading(true);
     try {
       const raw = await adminGetProperties(
         statusFilter ? { status: statusFilter } : {}
@@ -89,36 +207,41 @@ export default function AdminDashboardPage() {
     } catch {
       showToast("Could not load listings.", "error");
     } finally {
-      setLoading(false);
+      const elapsed = Date.now() - t0;
+      if (elapsed < MIN_SKELETON_MS) {
+        await sleep(MIN_SKELETON_MS - elapsed);
+      }
+      setListingsLoading(false);
     }
   }, [statusFilter]);
 
   const loadAgents = useCallback(async () => {
-    setLoading(true);
+    setBusy(true);
     try {
       const rows = await adminGetAgents();
       setAgents(rows as Record<string, unknown>[]);
     } catch {
       showToast("Could not load agents.", "error");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   }, []);
 
   const loadSellers = useCallback(async () => {
-    setLoading(true);
+    setBusy(true);
     try {
       const rows = await adminGetSellers();
       setSellers(rows as Record<string, unknown>[]);
     } catch {
       showToast("Could not load sellers.", "error");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   }, []);
 
   const loadVisits = useCallback(async () => {
-    setLoading(true);
+    const t0 = Date.now();
+    setVisitsLoading(true);
     try {
       const raw = await adminGetVisits({ page: visitPage, size: visitSize });
       setVisitRows((raw.content as Record<string, unknown>[]) ?? []);
@@ -126,7 +249,11 @@ export default function AdminDashboardPage() {
     } catch {
       showToast("Could not load visits.", "error");
     } finally {
-      setLoading(false);
+      const elapsed = Date.now() - t0;
+      if (elapsed < MIN_SKELETON_MS) {
+        await sleep(MIN_SKELETON_MS - elapsed);
+      }
+      setVisitsLoading(false);
     }
   }, [visitPage, visitSize]);
 
@@ -198,7 +325,7 @@ export default function AdminDashboardPage() {
       waE164 = digitsToIndiaE164(agentWaDigits);
     }
     try {
-      setLoading(true);
+      setBusy(true);
       await adminCreateAgent({
         name: agentName.trim(),
         phone: phoneE164,
@@ -218,7 +345,7 @@ export default function AdminDashboardPage() {
         "error"
       );
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
@@ -237,18 +364,29 @@ export default function AdminDashboardPage() {
       return;
     }
     try {
-      setLoading(true);
-      await adminCreateSeller({
-        name: sellerName.trim(),
-        phone: digitsToIndiaE164(sellerDigits),
-        password: sellerPassword,
-        preferredAgentId: sellerPreferredAgentId || null,
-      });
-      showToast("Seller created.", "success");
+      setBusy(true);
+      const phone = digitsToIndiaE164(sellerDigits);
+      if (sellerIsAgent) {
+        await adminCreateAgent({
+          name: sellerName.trim(),
+          phone,
+          whatsappNumber: phone,
+          assignedCities: "",
+          password: sellerPassword,
+        });
+        showToast("Agent created.", "success");
+      } else {
+        await adminCreateSeller({
+          name: sellerName.trim(),
+          phone,
+          password: sellerPassword,
+        });
+        showToast("Seller created.", "success");
+      }
       setSellerName("");
       setSellerDigits("");
       setSellerPassword("");
-      setSellerPreferredAgentId("");
+      setSellerIsAgent(false);
       await loadSellers();
     } catch (err) {
       showToast(
@@ -256,7 +394,64 @@ export default function AdminDashboardPage() {
         "error"
       );
     } finally {
-      setLoading(false);
+      setBusy(false);
+    }
+  };
+
+  const onDownloadVisitsCsv = async () => {
+    if (visitExportFrom > visitExportTo) {
+      showToast('"From" date must be on or before "To" date.', "error");
+      return;
+    }
+    setVisitExporting(true);
+    try {
+      const { blob, filename } = await adminDownloadVisitsCsv(
+        {
+          dateFrom: visitExportFrom,
+          dateTo: visitExportTo,
+        },
+        { token }
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast("Download started (UTF-8 CSV — open in Excel).", "success");
+    } catch (e) {
+      showToast(
+        getApiErrorMessage(e, "Could not export visits."),
+        "error"
+      );
+    } finally {
+      setVisitExporting(false);
+    }
+  };
+
+  const onAdminVisitStatus = async (
+    visitId: string,
+    status: "VISITED" | "SCHEDULED"
+  ) => {
+    setVisitUpdatingId(visitId);
+    try {
+      await adminUpdateVisitStatus(visitId, { status });
+      showToast(
+        status === "VISITED"
+          ? "Visit marked as completed."
+          : "Visit marked as pending.",
+        "success"
+      );
+      await loadVisits();
+    } catch (e) {
+      showToast(
+        e instanceof Error ? e.message : "Could not update visit.",
+        "error"
+      );
+    } finally {
+      setVisitUpdatingId(null);
     }
   };
 
@@ -266,10 +461,30 @@ export default function AdminDashboardPage() {
 
   return (
     <AppDashboardChrome variant="admin">
-    <div className="min-h-[100dvh] bg-[#FAF8F5] px-4 py-6 pb-12 md:px-8">
-      <div className="mx-auto max-w-3xl lg:max-w-4xl">
-        <h1 className="text-xl font-extrabold">Admin dashboard</h1>
-        <div className="mt-4 flex flex-wrap gap-2 border-b border-[#E8E0D8] pb-2">
+    <div className="min-h-[100dvh] bg-gradient-to-b from-[#FFF7EE] via-[#FAF8F5] to-[#FAF8F5] px-4 py-8 pb-16 md:px-8">
+      <div className="mx-auto max-w-5xl">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold tracking-wide text-[#7B6E62]">
+              ListMyNest Admin
+            </p>
+            <h1 className="text-2xl font-extrabold text-[#1A1108]">
+              Dashboard
+            </h1>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              logout();
+              router.replace("/admin/login");
+            }}
+            className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-border bg-white px-4 text-sm font-semibold text-[#1A1108] shadow-sm hover:bg-[#FFF7EE]"
+          >
+            Log out
+          </button>
+        </div>
+
+        <div className="mt-6 rounded-2xl border-2 border-border bg-white/80 p-2 shadow-md backdrop-blur">
           {(
             [
               ["listings", "Listings"],
@@ -283,8 +498,8 @@ export default function AdminDashboardPage() {
               onClick={() => setTab(k)}
               className={
                 tab === k
-                  ? "rounded-full bg-[#1A1108] px-4 py-2 text-xs font-semibold text-white"
-                  : "rounded-full px-4 py-2 text-xs font-semibold text-[#7B6E62]"
+                  ? "rounded-xl bg-[#1A1108] px-4 py-2.5 text-sm font-semibold text-white shadow-sm"
+                  : "rounded-xl px-4 py-2.5 text-sm font-semibold text-[#7B6E62] hover:bg-[#FFF7EE]"
               }
             >
               {label}
@@ -293,96 +508,180 @@ export default function AdminDashboardPage() {
         </div>
 
         {tab === "listings" ? (
-          <div className="mt-4">
-            <label className="text-xs font-semibold text-[#7B6E62]">
-              Filter status
-              <select
-                className="mt-1 w-full max-w-xs rounded-lg border bg-white px-3 py-2"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+          <div className="mt-6">
+            <div className="flex flex-col gap-3 rounded-2xl border-2 border-border bg-white p-4 shadow-md sm:flex-row sm:items-end sm:justify-between">
+              <label className="text-xs font-semibold text-[#7B6E62]">
+                Status
+                <select
+                  className="mt-2 min-h-[44px] w-full max-w-xs rounded-xl border border-border bg-white px-3 py-2 text-sm font-semibold text-[#1A1108] outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="">All</option>
+                  <option value="NEW">NEW</option>
+                  <option value="PENDING_REVIEW">PENDING REVIEW</option>
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="INACTIVE">INACTIVE</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => void loadListings()}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#1A1108] px-4 text-sm font-semibold text-white shadow-sm hover:opacity-95"
               >
-                <option value="">All</option>
-                <option value="NEW">NEW</option>
-                <option value="PENDING_REVIEW">PENDING_REVIEW</option>
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="INACTIVE">INACTIVE</option>
-              </select>
-            </label>
-            <button
-              type="button"
-              onClick={() => void loadListings()}
-              className="ml-2 mt-6 rounded-lg bg-[#F5EDE4] px-3 py-2 text-xs font-semibold text-[#7D4B1C]"
-            >
-              Refresh
-            </button>
-            {loading ? (
-              <p className="mt-4 text-sm text-[#7B6E62]">Loading…</p>
+                Refresh
+              </button>
+            </div>
+            {listingsLoading ? (
+              <AdminListingsSkeleton />
             ) : (
-              <ul className="mt-4 space-y-3">
-                {listings.map((p) => {
-                  const id = String(p.id ?? "");
-                  const title = String(p.title ?? "");
-                  const city = String(p.city ?? "");
-                  const st = String(p.status ?? "");
-                  return (
-                    <li
-                      key={id}
-                      className="rounded-xl bg-white p-3 shadow-sm"
-                    >
-                      <Link
-                        href={`/admin/properties/${encodeURIComponent(id)}`}
-                        className="block font-semibold text-[#1A1108] underline"
+                <ul className="mt-4 space-y-3">
+                  {listings.map((p) => {
+                    const id = String(p.id ?? "");
+                    const title = String(p.title ?? "");
+                    const city = String(p.city ?? "");
+                    const st = String(p.status ?? "");
+                    return (
+                      <li
+                        key={id}
+                        className="rounded-2xl border-2 border-border bg-white p-4 shadow-md"
                       >
-                        {title || "Property"}
-                      </Link>
-                      <p className="text-xs text-[#7B6E62]">
-                        {city} · {st}
-                      </p>
-                      <div className="mt-2 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void onActivate(id)}
-                          className="rounded-lg bg-[#1E8449] px-3 py-1.5 text-xs font-semibold text-white"
+                        <Link
+                          href={`/admin/properties/${encodeURIComponent(id)}`}
+                          className="block text-sm font-extrabold text-[#1A1108] underline decoration-border underline-offset-4 hover:decoration-[#E63946]"
                         >
-                          Activate
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void onReject(id)}
-                          className="rounded-lg bg-[#922B21] px-3 py-1.5 text-xs font-semibold text-white"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+                          {title || "Property"}
+                        </Link>
+                        <p className="text-xs text-[#7B6E62]">
+                          {city} · {st}
+                        </p>
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void onActivate(id)}
+                            className="rounded-xl bg-[#1E8449] px-3 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-95"
+                          >
+                            Activate
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void onReject(id)}
+                            className="rounded-xl bg-[#922B21] px-3 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-95"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
             )}
           </div>
         ) : null}
 
         {tab === "visits" ? (
-          <div className="mt-4">
-            <p className="text-xs text-[#7B6E62]">
-              All property visit bookings (newest batch on first page).
-            </p>
-            <button
-              type="button"
-              onClick={() => void loadVisits()}
-              className="mt-2 rounded-lg bg-[#F5EDE4] px-3 py-2 text-xs font-semibold text-[#7D4B1C]"
-            >
-              Refresh
-            </button>
-            {loading ? (
-              <p className="mt-4 text-sm text-[#7B6E62]">Loading…</p>
+          <div className="mt-6 space-y-4">
+            <div className="flex flex-col gap-3 rounded-2xl border-2 border-border bg-gradient-to-br from-white to-[#FFF9F3] p-4 shadow-md sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-extrabold text-[#1A1108]">
+                  Scheduled visits
+                </p>
+                <p className="text-xs font-medium text-[#7B6E62]">
+                  Newest first. Mark completed when the buyer has been seen, or
+                  pending to reopen.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={visitsLoading}
+                onClick={() => void loadVisits()}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#1A1108] px-4 text-sm font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-50"
+              >
+                {visitsLoading ? "Refreshing…" : "Refresh"}
+              </button>
+            </div>
+
+            <div className="rounded-2xl border-2 border-border bg-white p-4 shadow-md sm:p-5">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wide text-[#7B6E62]">
+                    Export (Excel)
+                  </p>
+                  <p className="mt-1 text-xs text-[#7B6E62]">
+                    UTF-8 CSV with BOM — filtered by{" "}
+                    <span className="font-semibold text-[#5C524A]">
+                      visit date
+                    </span>{" "}
+                    (inclusive). Opens directly in Excel.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                  <label className="flex min-w-[140px] flex-col text-[11px] font-semibold text-[#5C524A]">
+                    From
+                    <input
+                      type="date"
+                      value={visitExportFrom}
+                      onChange={(e) => setVisitExportFrom(e.target.value)}
+                      className="mt-1 min-h-[44px] rounded-xl border border-border bg-[#FFFCF9] px-3 py-2 text-sm font-semibold text-[#1A1108] outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                    />
+                  </label>
+                  <label className="flex min-w-[140px] flex-col text-[11px] font-semibold text-[#5C524A]">
+                    To
+                    <input
+                      type="date"
+                      value={visitExportTo}
+                      onChange={(e) => setVisitExportTo(e.target.value)}
+                      className="mt-1 min-h-[44px] rounded-xl border border-border bg-[#FFFCF9] px-3 py-2 text-sm font-semibold text-[#1A1108] outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={visitExporting}
+                    onClick={() => void onDownloadVisitsCsv()}
+                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 self-start rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-800 disabled:opacity-50 sm:self-end"
+                    title="Download CSV (Excel)"
+                  >
+                    <Download className="size-5 shrink-0" aria-hidden />
+                    <span className="sm:inline">
+                      {visitExporting ? "Preparing…" : "Download"}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {visitsLoading && visitRows.length === 0 ? (
+              <AdminVisitsSkeleton />
             ) : visitRows.length === 0 ? (
-              <p className="mt-4 text-sm text-[#7B6E62]">No visits yet.</p>
+              <div className="rounded-2xl border border-dashed border-[#D2C6BC] bg-[#F7F0EA] px-6 py-10 text-center">
+                <p className="text-sm font-semibold text-[#1A1108]">
+                  No visits yet
+                </p>
+                <p className="mt-1 text-xs text-[#7B6E62]">
+                  Buyer visit requests will show up here.
+                </p>
+              </div>
             ) : (
               <>
-                <ul className="mt-4 space-y-2">
+                <div className="relative mt-1">
+                  {visitsLoading ? (
+                    <div
+                      className="pointer-events-none absolute inset-0 z-10 flex justify-center rounded-2xl bg-[#FAF8F5]/80 py-6 backdrop-blur-[2px]"
+                      aria-hidden
+                    >
+                      <div className="w-full max-w-2xl opacity-95">
+                        <AdminVisitsSkeleton rows={3} className="mt-0" />
+                      </div>
+                    </div>
+                  ) : null}
+                  <ul
+                    className={`space-y-3 ${visitsLoading ? "min-h-[200px] opacity-45" : ""}`}
+                  >
                   {visitRows.map((row) => {
                     const id = String(row.id ?? "");
+                    const propId = String(
+                      row.propertyId ?? row.property_id ?? ""
+                    );
                     const title = String(
                       row.propertyTitle ?? row.property_title ?? "—"
                     );
@@ -392,42 +691,119 @@ export default function AdminDashboardPage() {
                     const d = String(row.visitDate ?? row.visit_date ?? "");
                     const t = String(row.visitTime ?? row.visit_time ?? "");
                     const st = String(row.status ?? "");
+                    const updating = visitUpdatingId === id;
+                    const showDone = canMarkVisitCompleted(st);
+                    const showPending = canMarkVisitPending(st);
                     return (
                       <li
                         key={id}
-                        className="rounded-xl bg-white p-3 text-sm shadow-sm"
+                        className="rounded-2xl border-2 border-border bg-white p-4 text-sm shadow-md md:p-5"
                       >
-                        <p className="font-semibold text-[#1A1108]">{title}</p>
-                        <p className="text-xs text-[#7B6E62]">
-                          {d} · {t} · {phone}
-                        </p>
-                        <p className="mt-1 text-[10px] font-bold uppercase text-[#7D4B1C]">
-                          {st.replace(/_/g, " ")}
-                        </p>
+                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span
+                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${visitStatusBadgeClass(st)}`}
+                              >
+                                {st.replace(/_/g, " ")}
+                              </span>
+                            </div>
+                            {propId ? (
+                              <Link
+                                href={`/property/${encodeURIComponent(propId)}`}
+                                className="block text-base font-bold text-[#1A1108] underline decoration-border underline-offset-2 hover:decoration-[#E63946]"
+                              >
+                                {title}
+                              </Link>
+                            ) : (
+                              <p className="text-base font-bold text-[#1A1108]">
+                                {title}
+                              </p>
+                            )}
+                            <div className="flex flex-col gap-1 text-xs text-[#7B6E62] sm:flex-row sm:flex-wrap sm:gap-x-4">
+                              <span>
+                                <span className="font-semibold text-[#5C524A]">
+                                  Date
+                                </span>{" "}
+                                {d}
+                              </span>
+                              <span>
+                                <span className="font-semibold text-[#5C524A]">
+                                  Time
+                                </span>{" "}
+                                {t}
+                              </span>
+                              <span>
+                                <span className="font-semibold text-[#5C524A]">
+                                  Buyer
+                                </span>{" "}
+                                {phone}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+                            {showDone ? (
+                              <button
+                                type="button"
+                                disabled={updating}
+                                onClick={() =>
+                                  void onAdminVisitStatus(id, "VISITED")
+                                }
+                                className="inline-flex min-h-[42px] min-w-[10.5rem] items-center justify-center rounded-xl bg-emerald-700 px-4 text-xs font-bold text-white shadow-sm hover:bg-emerald-800 disabled:opacity-50"
+                              >
+                                {updating ? "Saving…" : "Mark completed"}
+                              </button>
+                            ) : null}
+                            {showPending ? (
+                              <button
+                                type="button"
+                                disabled={updating}
+                                onClick={() =>
+                                  void onAdminVisitStatus(id, "SCHEDULED")
+                                }
+                                className="inline-flex min-h-[42px] min-w-[10.5rem] items-center justify-center rounded-xl border border-[#D2C6BC] bg-[#FFF7EE] px-4 text-xs font-bold text-[#5C4030] shadow-sm hover:bg-[#FFECD9] disabled:opacity-50"
+                              >
+                                {updating ? "Saving…" : "Mark pending"}
+                              </button>
+                            ) : null}
+                            {!showDone && !showPending ? (
+                              <p className="text-[11px] font-medium text-[#7B6E62]">
+                                Status can be changed from the agent app, or
+                                contact support to adjust cancelled visits.
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
                       </li>
                     );
                   })}
-                </ul>
-                <div className="mt-4 flex items-center gap-2 text-xs text-[#7B6E62]">
-                  <button
-                    type="button"
-                    disabled={visitPage <= 0}
-                    onClick={() => setVisitPage((p) => Math.max(0, p - 1))}
-                    className="rounded-lg border border-[#E8E0D8] px-3 py-1.5 font-semibold disabled:opacity-40"
-                  >
-                    Previous
-                  </button>
-                  <span>
+                  </ul>
+                </div>
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-border bg-[#FDFBF8] px-4 py-3 text-xs text-[#7B6E62]">
+                  <span className="font-semibold text-[#5C524A]">
                     Page {visitPage + 1} · {visitTotal} total
                   </span>
-                  <button
-                    type="button"
-                    disabled={(visitPage + 1) * visitSize >= visitTotal}
-                    onClick={() => setVisitPage((p) => p + 1)}
-                    className="rounded-lg border border-[#E8E0D8] px-3 py-1.5 font-semibold disabled:opacity-40"
-                  >
-                    Next
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={visitPage <= 0 || visitsLoading}
+                      onClick={() => setVisitPage((p) => Math.max(0, p - 1))}
+                      className="rounded-xl border border-border bg-white px-3 py-2 font-semibold text-[#1A1108] shadow-sm disabled:opacity-40"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      disabled={
+                        (visitPage + 1) * visitSize >= visitTotal ||
+                        visitsLoading
+                      }
+                      onClick={() => setVisitPage((p) => p + 1)}
+                      className="rounded-xl border border-border bg-white px-3 py-2 font-semibold text-[#1A1108] shadow-sm disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               </>
             )}
@@ -435,34 +811,33 @@ export default function AdminDashboardPage() {
         ) : null}
 
         {tab === "sellers" ? (
-          <div className="mt-4 space-y-6">
+          <div className="mt-6 space-y-6">
             <form
-              className="rounded-xl bg-white p-4 shadow-sm"
+              className="rounded-2xl border-2 border-border bg-white p-5 shadow-md"
               onSubmit={(e) => void onCreateSeller(e)}
             >
-              <h2 className="font-extrabold">Create seller</h2>
+              <h2 className="text-sm font-extrabold text-[#1A1108]">
+                Create account
+              </h2>
+              <p className="mt-1 text-xs font-medium text-[#7B6E62]">
+                Create a Seller (default) or an Agent (checkbox).
+              </p>
               <input
                 required
                 placeholder="Name"
-                className="mb-2 mt-2 w-full rounded-lg border px-3 py-2"
+                className="mb-2 mt-4 min-h-[44px] w-full rounded-xl border border-border bg-white px-3 py-2 text-sm font-semibold text-[#1A1108] outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 value={sellerName}
                 onChange={(e) => setSellerName(e.target.value)}
               />
-              <label className="mb-2 block text-xs font-semibold text-[#7B6E62]">
-                Assign agent (optional)
-                <select
-                  className="mt-1 w-full rounded-lg border bg-white px-3 py-2"
-                  value={sellerPreferredAgentId}
-                  onChange={(e) => setSellerPreferredAgentId(e.target.value)}
-                >
-                  <option value="">No agent</option>
-                  {agents.map((a) => (
-                    <option key={String(a.id)} value={String(a.id)}>
-                      {String(a.name ?? "")}
-                    </option>
-                  ))}
-                </select>
+              <label className="mb-2 flex items-center gap-2 text-xs font-semibold text-[#7B6E62]">
+                <input
+                  type="checkbox"
+                  checked={sellerIsAgent}
+                  onChange={(e) => setSellerIsAgent(e.target.checked)}
+                />
+                Agent?
               </label>
+              {/* preferred agent assignment removed (per request) */}
               <div className="mb-2">
                 <PhoneDigitsField
                   id="admin-seller-phone"
@@ -475,13 +850,14 @@ export default function AdminDashboardPage() {
                 required
                 placeholder="Password"
                 type="password"
-                className="mb-2 w-full rounded-lg border px-3 py-2"
+                className="mb-2 min-h-[44px] w-full rounded-xl border border-border bg-white px-3 py-2 text-sm font-semibold text-[#1A1108] outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 value={sellerPassword}
                 onChange={(e) => setSellerPassword(e.target.value)}
               />
               <button
                 type="submit"
-                className="w-full rounded-xl bg-[#7D4B1C] py-3 font-semibold text-white"
+                disabled={busy}
+                className="w-full rounded-xl bg-[#1A1108] py-3 text-sm font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-50"
               >
                 Create
               </button>
@@ -490,7 +866,7 @@ export default function AdminDashboardPage() {
               {sellers.map((s) => (
                 <li
                   key={String(s.id)}
-                  className="rounded-lg bg-white p-3 text-sm shadow-sm"
+                  className="rounded-2xl border-2 border-border bg-white p-4 text-sm shadow-md"
                 >
                   {String(s.name ?? "")} · {String(s.phone ?? "")}
                 </li>
@@ -498,17 +874,6 @@ export default function AdminDashboardPage() {
             </ul>
           </div>
         ) : null}
-
-        <button
-          type="button"
-          className="mt-10 text-sm font-semibold text-[#7B6E62] underline"
-          onClick={() => {
-            logout();
-            router.replace("/admin/login");
-          }}
-        >
-          Log out
-        </button>
       </div>
     </div>
     </AppDashboardChrome>

@@ -13,6 +13,8 @@ import { useAuthStore } from "../../lib/store";
 import { showToast } from "../../lib/toast";
 import { PropertyRemoteImage } from "../../components/property/PropertyRemoteImage";
 import { formatPriceRangeLakh } from "../../lib/utils/formatPrice";
+import { Skeleton } from "../../components/ui/Skeleton";
+import { Button } from "../../components/ui/Button";
 
 function normalizeSaved(row: Record<string, unknown>) {
   return {
@@ -114,48 +116,43 @@ export default function SavedPage() {
 
   if (!buyerToken) {
     return (
-      <main className="mx-auto min-h-[100dvh] max-w-md bg-[#FAF8F5] px-4 py-8">
-        <Link href="/" className="text-sm font-semibold text-[#C0392B]">
+      <main className="mx-auto min-h-[100dvh] max-w-md bg-bg px-4 py-8">
+        <Link href="/" className="text-sm font-semibold text-lmn-primary">
           ← Home
         </Link>
-        <h1 className="mt-6 text-xl font-extrabold">Saved listings</h1>
-        <p className="mt-2 text-sm text-[#7B6E62]">
+        <h1 className="lmn-h1 mt-6 text-text">Saved listings</h1>
+        <p className="mt-2 text-sm text-muted">
           Verify your phone to see saved listings.
         </p>
         <div className="mt-6 space-y-3">
           {step === "phone" ? (
             <>
               <input
-                className="w-full rounded-xl border border-[#E8E0D8] bg-white px-4 py-3"
+                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-text shadow-sm outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-bg"
                 placeholder="+91 …"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
               />
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void onSendOtp()}
-                className="w-full rounded-xl bg-[#C0392B] py-3 font-semibold text-white"
-              >
+              <Button fullWidth loading={busy} onClick={() => void onSendOtp()}>
                 Send OTP
-              </button>
+              </Button>
             </>
           ) : (
             <>
               <input
-                className="w-full rounded-xl border border-[#E8E0D8] bg-white px-4 py-3"
+                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-text shadow-sm outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-bg"
                 placeholder="OTP"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
               />
-              <button
-                type="button"
-                disabled={busy}
+              <Button
+                fullWidth
+                loading={busy}
+                variant="secondary"
                 onClick={() => void onVerify()}
-                className="w-full rounded-xl bg-[#7D4B1C] py-3 font-semibold text-white"
               >
                 Verify
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -164,27 +161,40 @@ export default function SavedPage() {
   }
 
   return (
-    <main className="mx-auto min-h-[100dvh] max-w-md bg-[#FAF8F5] px-4 py-8 pb-24">
-      <Link href="/" className="text-sm font-semibold text-[#C0392B]">
+    <main className="mx-auto min-h-[100dvh] max-w-md bg-bg px-4 py-8 pb-24">
+      <Link href="/" className="text-sm font-semibold text-lmn-primary">
         ← Home
       </Link>
-      <h1 className="mt-6 text-xl font-extrabold">Saved</h1>
+      <h1 className="lmn-h1 mt-6 text-text">Saved</h1>
       {loading ? (
-        <p className="mt-4 text-sm text-[#7B6E62]">Loading…</p>
+        <ul className="mt-4 space-y-4">
+          {[1, 2, 3].map((k) => (
+            <li key={k} className="rounded-3xl border-2 border-border bg-surface p-3 shadow-md">
+              <div className="flex gap-3">
+                <Skeleton className="size-20 shrink-0 rounded-2xl" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-4/5" />
+                  <Skeleton className="h-4 w-2/5" />
+                  <Skeleton className="h-3 w-1/3" />
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
       ) : items.length === 0 ? (
-        <p className="mt-4 text-sm text-[#7B6E62]">No saved listings yet.</p>
+        <p className="mt-4 text-sm text-muted">No saved listings yet.</p>
       ) : (
         <ul className="mt-4 space-y-4">
           {items.map((s) => (
             <li
               key={s.id}
-              className="overflow-hidden rounded-2xl bg-white shadow-sm"
+              className="overflow-hidden rounded-3xl border-2 border-border bg-surface shadow-md"
             >
               <Link
                 href={`/property/${encodeURIComponent(s.propertyId)}`}
                 className="flex gap-3 p-3"
               >
-                <div className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-[#F5EDE4]">
+                <div className="relative size-20 shrink-0 overflow-hidden rounded-2xl bg-surface2">
                   {s.photo ? (
                     <PropertyRemoteImage
                       src={s.photo}
@@ -196,23 +206,23 @@ export default function SavedPage() {
                   ) : null}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-sm font-bold text-[#1A1108]">
+                  <p className="line-clamp-2 text-sm font-extrabold text-text">
                     {s.title}
                   </p>
-                  <p className="text-sm font-extrabold text-[#C0392B]">
+                  <p className="text-sm font-extrabold text-lmn-primary">
                     {formatPriceRangeLakh(s.priceMin, s.priceMax)}
                   </p>
-                  <p className="text-xs text-[#7B6E62]">{s.city}</p>
-                  <span className="mt-1 inline-block rounded-full bg-[#F5EDE4] px-2 py-0.5 text-[10px] font-bold">
+                  <p className="text-xs text-muted">{s.city}</p>
+                  <span className="mt-1 inline-block rounded-full bg-surface2 px-2 py-0.5 text-[10px] font-bold text-text ring-1 ring-border">
                     {s.status}
                   </span>
                 </div>
               </Link>
-              <div className="border-t border-[#F5EDE4] px-3 py-2">
+              <div className="border-t border-border px-3 py-2">
                 <button
                   type="button"
                   onClick={() => void onRemove(s.propertyId)}
-                  className="text-xs font-semibold text-[#922B21]"
+                  className="text-xs font-semibold text-danger"
                 >
                   Remove
                 </button>

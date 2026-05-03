@@ -12,7 +12,7 @@ export function NotifyMeBanner() {
 
   return (
     <section className="px-4 sm:px-6" aria-labelledby="notify-banner-title">
-      <div className="rounded-2xl border border-lmn-border bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border-2 border-lmn-border bg-white p-4 shadow-md">
         <h2
           id="notify-banner-title"
           className="text-base font-extrabold text-lmn-dark"

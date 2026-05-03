@@ -9,9 +9,9 @@ import {
 } from "../lib/toast";
 
 function toastStyles(type: ToastType): string {
-  if (type === "success") return "bg-lmn-verified text-white";
-  if (type === "error") return "bg-lmn-primary text-white";
-  return "bg-lmn-dark text-white";
+  if (type === "success") return "bg-success text-white";
+  if (type === "error") return "bg-danger text-white";
+  return "bg-text text-surface";
 }
 
 export function ToastHost() {
@@ -25,7 +25,7 @@ export function ToastHost() {
 
   useEffect(() => {
     if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 3000);
+    const timer = window.setTimeout(() => setToast(null), 4000);
     return () => window.clearTimeout(timer);
   }, [toast]);
 
@@ -33,11 +33,16 @@ export function ToastHost() {
 
   return (
     <div
-      className="pointer-events-none fixed bottom-20 left-0 right-0 z-[100] flex justify-center px-4 sm:bottom-8"
-      role="status"
+      className="pointer-events-none fixed right-4 top-4 z-[120] flex w-[calc(100%-2rem)] justify-end sm:w-auto"
+      role={toast.type === "error" ? "alert" : "status"}
     >
       <div
-        className={`pointer-events-auto max-w-md rounded-2xl px-4 py-3 text-center text-sm font-semibold shadow-lg ${toastStyles(toast.type)}`}
+        className={[
+          "pointer-events-auto max-w-md rounded-2xl px-4 py-3 text-sm font-semibold shadow-lg",
+          "translate-y-0 opacity-100",
+          "transition-[transform,opacity] duration-base",
+          toastStyles(toast.type),
+        ].join(" ")}
       >
         {toast.message}
       </div>

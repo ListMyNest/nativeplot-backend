@@ -165,10 +165,10 @@ export default function AgentDashboardPage() {
 
   return (
     <AppDashboardChrome variant="agent">
-    <div className="min-h-[100dvh] bg-[#FAF8F5] px-4 py-6 pb-12 md:px-8">
+      <div className="min-h-[100dvh] bg-bg px-4 py-6 pb-12 md:px-8">
       <div className="mx-auto max-w-lg lg:max-w-4xl">
-        <h1 className="text-xl font-extrabold text-[#1A1108]">Agent</h1>
-        <p className="text-sm text-[#7B6E62]">Today · {today}</p>
+        <h1 className="font-heading text-xl font-extrabold text-text">Agent</h1>
+        <p className="text-sm text-muted">Today · {today}</p>
 
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {[
@@ -179,44 +179,46 @@ export default function AgentDashboardPage() {
           ].map(([label, value]) => (
             <div
               key={label}
-              className="rounded-xl bg-white p-3 shadow-sm"
+              className="rounded-2xl border-2 border-border bg-surface p-3 shadow-md"
             >
-              <p className="text-lg font-extrabold tabular-nums">{value}</p>
-              <p className="text-[10px] font-medium text-[#7B6E62]">{label}</p>
+              <p className="text-lg font-extrabold tabular-nums text-text">{value}</p>
+              <p className="text-[10px] font-medium text-muted">{label}</p>
             </div>
           ))}
         </div>
 
-        <h2 className="mt-8 text-lg font-extrabold">Today&apos;s visits</h2>
+        <h2 className="font-heading mt-8 text-lg font-extrabold text-text">
+          Today&apos;s visits
+        </h2>
         {loading ? (
-          <p className="text-sm text-[#7B6E62]">Loading…</p>
+          <p className="text-sm text-muted">Loading…</p>
         ) : visits.length === 0 ? (
-          <p className="text-sm text-[#7B6E62]">No visits today.</p>
+          <p className="text-sm text-muted">No visits today.</p>
         ) : (
           <ul className="mt-3 space-y-3">
             {visits.map((v) => (
               <li
                 key={v.id}
-                className="rounded-2xl bg-white p-3 shadow-sm"
+                className="rounded-2xl border-2 border-border bg-surface p-4 shadow-md"
               >
-                <p className="text-sm font-bold text-[#1A1108]">
+                <p className="text-sm font-bold text-text">
                   {v.propertyTitle}
                 </p>
-                <p className="text-xs text-[#7B6E62]">
+                <p className="text-xs text-muted">
                   {v.buyerPhone} · {v.visitDate} {v.visitTime} · {v.status}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => void markVisited(v.id, "VISITED")}
-                    className="rounded-lg bg-[#1E8449] px-3 py-1.5 text-xs font-semibold text-white"
+                    className="rounded-xl bg-success px-3 py-2 text-xs font-semibold text-white shadow-sm transition-[transform,box-shadow] duration-fast hover:shadow-md active:scale-[0.98]"
                   >
                     Mark visited
                   </button>
                   <button
                     type="button"
                     onClick={() => void markVisited(v.id, "NOT_VISITED")}
-                    className="rounded-lg bg-[#922B21] px-3 py-1.5 text-xs font-semibold text-white"
+                    className="rounded-xl bg-danger px-3 py-2 text-xs font-semibold text-white shadow-sm transition-[transform,box-shadow] duration-fast hover:shadow-md active:scale-[0.98]"
                   >
                     Not visited
                   </button>

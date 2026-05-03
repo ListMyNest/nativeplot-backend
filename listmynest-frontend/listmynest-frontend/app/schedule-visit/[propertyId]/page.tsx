@@ -8,6 +8,8 @@ import { PropertyRemoteImage } from "../../../components/property/PropertyRemote
 import { getPropertyDetail, scheduleVisit } from "../../../lib/api";
 import { formatPriceRangeLakh } from "../../../lib/utils/formatPrice";
 import type { PropertyDetail } from "../../../types";
+import { Skeleton } from "../../../components/ui/Skeleton";
+import { Button } from "../../../components/ui/Button";
 
 const TIME_SLOTS = [
   { label: "10:00 AM", value: "10:00:00" },
@@ -132,30 +134,30 @@ export default function ScheduleVisitPage() {
   const displayId = property?.property_code?.trim() || property?.id || "—";
 
   return (
-    <div className="min-h-[100dvh] bg-[#FAF8F5] pb-8">
-      <header className="sticky top-14 z-20 flex items-center gap-2 border-b border-[#E8E0D8] bg-white px-4 py-3 sm:top-[3.75rem] sm:px-6">
+    <div className="min-h-[100dvh] bg-bg pb-8">
+      <header className="sticky top-14 z-20 flex items-center gap-2 border-b border-border bg-surface/85 px-4 py-3 shadow-sm backdrop-blur sm:top-[3.75rem] sm:px-6">
         <Link
           href={propertyId ? `/property/${encodeURIComponent(propertyId)}` : "/"}
-          className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-[#F5EDE4] text-lg leading-none text-[#7D4B1C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C0392B] focus-visible:ring-offset-2"
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-lg leading-none text-text shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           aria-label="Back"
         >
           ←
         </Link>
-        <h1 className="text-base font-extrabold text-[#1A1108]">
+        <h1 className="text-base font-extrabold text-text">
           Schedule a Visit
         </h1>
       </header>
 
       <div className="mx-auto w-full max-w-lg space-y-6 px-4 pt-4 sm:px-6 md:max-w-2xl md:px-8">
         {loadError ? (
-          <p className="rounded-2xl bg-[#F9EBEA] px-4 py-3 text-sm text-[#922B21]">
+          <p className="rounded-2xl border border-danger/25 bg-surface px-4 py-3 text-sm text-danger shadow-sm">
             {loadError}
           </p>
         ) : null}
 
         {property ? (
-          <div className="flex gap-3 rounded-2xl bg-[#F5EDE4] p-3">
-            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-[linear-gradient(145deg,#F5EDE4_0%,#FEF3DC_55%,#E8E0D8_100%)]">
+          <div className="flex gap-3 rounded-3xl border-2 border-border bg-surface p-3 shadow-md">
+            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-surface2">
               {property.primary_photo ? (
                 <PropertyRemoteImage
                   src={property.primary_photo}
@@ -167,19 +169,19 @@ export default function ScheduleVisitPage() {
               ) : null}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="line-clamp-2 text-sm font-semibold leading-snug text-[#1A1108]">
+              <p className="line-clamp-2 text-sm font-extrabold leading-snug text-text">
                 {property.title}
               </p>
-              <p className="mt-0.5 text-[11px] font-medium text-[#7B6E62]">
+              <p className="mt-0.5 text-[11px] font-medium text-muted">
                 ID: {displayId}
               </p>
-              <p className="mt-1 text-sm font-extrabold text-[#C0392B]">
+              <p className="mt-1 text-sm font-extrabold text-lmn-primary">
                 {priceLine}
               </p>
             </div>
           </div>
         ) : !loadError ? (
-          <div className="h-24 animate-pulse rounded-2xl bg-[#E8E0D8]" />
+          <Skeleton className="h-24 rounded-3xl" />
         ) : null}
 
         <section aria-labelledby="select-date-label">
@@ -199,8 +201,8 @@ export default function ScheduleVisitPage() {
                   onClick={() => setSelectedYmd(ymd)}
                   className={
                     active
-                      ? "flex h-[72px] w-[50px] shrink-0 flex-col items-center justify-center rounded-xl bg-[#C0392B] text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C0392B] focus-visible:ring-offset-2"
-                      : "flex h-[72px] w-[50px] shrink-0 flex-col items-center justify-center rounded-xl border border-[#E8E0D8] bg-white text-[#1A1108] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C0392B] focus-visible:ring-offset-2"
+                      ? "flex h-[72px] w-[50px] shrink-0 flex-col items-center justify-center rounded-xl bg-lmn-primary text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                      : "flex h-[72px] w-[50px] shrink-0 flex-col items-center justify-center rounded-xl border border-border bg-surface text-text shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
                   }
                 >
                   <span className="text-[11px] font-semibold capitalize">
@@ -232,8 +234,8 @@ export default function ScheduleVisitPage() {
                   onClick={() => setSelectedTime(value)}
                   className={
                     active
-                      ? "rounded-xl bg-[#C0392B] py-3 text-center text-xs font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C0392B] focus-visible:ring-offset-2"
-                      : "rounded-xl border border-[#E8E0D8] bg-white py-3 text-center text-xs font-semibold text-[#1A1108] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C0392B] focus-visible:ring-offset-2"
+                      ? "rounded-xl bg-lmn-primary py-3 text-center text-xs font-semibold text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                      : "rounded-xl border border-border bg-surface py-3 text-center text-xs font-semibold text-text shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
                   }
                 >
                   {label}
@@ -246,7 +248,7 @@ export default function ScheduleVisitPage() {
         <div>
           <label
             htmlFor="buyer-phone"
-            className="mb-1.5 block text-xs font-semibold text-[#7B6E62]"
+            className="mb-1.5 block text-xs font-semibold text-muted"
           >
             Your number — Agent will call 1 hour before to confirm
           </label>
@@ -258,43 +260,43 @@ export default function ScheduleVisitPage() {
             placeholder="+91 98765 43210"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="w-full rounded-xl border border-[#E8E0D8] bg-white px-4 py-3.5 text-[15px] text-[#1A1108] outline-none ring-0 placeholder:text-[#B0A499] focus:border-[#C0392B] focus:ring-2 focus:ring-[#C0392B]/25"
+            className="w-full rounded-2xl border border-border bg-surface px-4 py-3.5 text-[15px] text-text shadow-sm outline-none ring-0 placeholder:text-muted focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-bg"
           />
         </div>
 
         {formError ? (
-          <p className="text-sm font-medium text-[#C0392B]" role="alert">
+          <p className="text-sm font-medium text-danger" role="alert">
             {formError}
           </p>
         ) : null}
 
-        <button
-          type="button"
-          disabled={submitting || !property}
+        <Button
+          fullWidth
+          loading={submitting}
+          disabled={!property}
           onClick={() => void onConfirm()}
-          className="flex h-[52px] w-full items-center justify-center rounded-xl bg-[#C0392B] text-base font-extrabold text-white shadow-sm disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C0392B] focus-visible:ring-offset-2"
         >
-          {submitting ? "Sending…" : "Confirm Visit"}
-        </button>
+          Confirm Visit
+        </Button>
 
         <div className="flex items-center gap-3 py-1">
-          <div className="h-px flex-1 bg-[#E8E0D8]" />
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-[#B0A499]">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-muted">
             Or
           </span>
-          <div className="h-px flex-1 bg-[#E8E0D8]" />
+          <div className="h-px flex-1 bg-border" />
         </div>
 
         {telHref ? (
           <a
             href={telHref}
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-white bg-white text-sm font-semibold text-[#1A1108] shadow-[inset_0_0_0_1px_#E8E0D8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C0392B] focus-visible:ring-offset-2"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface text-sm font-semibold text-text shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           >
             <span aria-hidden>📞</span>
             Call Instead
           </a>
         ) : (
-          <span className="flex h-12 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border-2 border-white bg-white text-sm font-semibold text-[#B0A499] shadow-[inset_0_0_0_1px_#E8E0D8]">
+          <span className="flex h-12 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-border bg-surface text-sm font-semibold text-muted shadow-sm">
             <span aria-hidden>📞</span>
             Call Instead
           </span>

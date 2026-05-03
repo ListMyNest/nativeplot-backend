@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo } from "react";
 
+/* eslint-disable @next/next/no-img-element */
 export function LocalPreviewImage({
   file,
   alt,
@@ -19,14 +19,12 @@ export function LocalPreviewImage({
   }, [url]);
 
   return (
-    <Image
+    <img
       src={url}
       alt={alt}
-      width={960}
-      height={540}
       className={className}
-      unoptimized
       loading="lazy"
+      draggable={false}
     />
   );
 }

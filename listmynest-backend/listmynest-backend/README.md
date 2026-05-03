@@ -66,6 +66,12 @@ The Next.js app should call:
 - **Never commit** `.env` with production credentials.
 - Prefer **`application.yml`** only on your machine, or rely entirely on environment variables as in the committed `application.yml` defaults.
 
+## Production database & VM ops
+
+**Recommendation:** run **PostgreSQL on a managed provider** (Supabase/Neon/RDS, etc.), not on the same 4 vCPU VM as the API, for reliability and connection headroom. If the DB must share the VM, cap connections, automate backups, and expect a lower concurrency ceiling—see the monorepo **`docs/PRODUCTION_DEPLOYMENT.md`**.
+
+Tuning for concurrency (HikariCP, Tomcat threads, HTTP client timeouts, optional Redis-backed listing + geocode cache, IP rate limits) is described in **`src/main/resources/application.yml.example`**.
+
 ## Build JAR
 
 ```bash

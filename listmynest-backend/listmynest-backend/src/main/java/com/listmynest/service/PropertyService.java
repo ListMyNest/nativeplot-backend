@@ -1,5 +1,7 @@
 package com.listmynest.service;
 
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.listmynest.dto.PageResponse;
 import com.listmynest.dto.PropertyDetailDTO;
 import com.listmynest.dto.PublicPropertyDTO;
@@ -12,6 +14,7 @@ import jakarta.persistence.criteria.Predicate;
 import com.listmynest.util.LogMaskUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -25,6 +28,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -35,6 +39,42 @@ public class PropertyService {
     private final PropertyRepository propertyRepository;
     private final PropertyListingAssembler propertyListingAssembler;
     private final RedisService redisService;
+    private final ObjectMapper objectMapper;
+
+    @Value("${listmynest.cache.public-listings-ttl-seconds:0}")
+    private int publicListingsCacheTtlSeconds;
+
+    private JavaType pagePublicJavaType() {
+        return objectMapper.getTypeFactory().constructParametricType(PageResponse.class, PublicPropertyDTO.class);
+    }
+
+    private Optional<PageResponse<PublicPropertyDTO>> readPublicListingCache(String key) {
+        if (publicListingsCacheTtlSeconds <= 0) {
+            return Optional.empty();
+        }
+        try {
+            String json = redisService.get(key);
+            if (json == null || json.isBlank()) {
+                return Optional.empty();
+            }
+            return Optional.of(objectMapper.readValue(json, pagePublicJavaType()));
+        } catch (Exception e) {
+            log.warn("Public listing cache read failed: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private void writePublicListingCache(String key, PageResponse<PublicPropertyDTO> page) {
+        if (publicListingsCacheTtlSeconds <= 0) {
+            return;
+        }
+        try {
+            String json = objectMapper.writeValueAsString(page);
+            redisService.set(key, json, publicListingsCacheTtlSeconds);
+        } catch (Exception e) {
+            log.warn("Public listing cache write failed: {}", e.getMessage());
+        }
+    }
 
     @Transactional(readOnly = true)
     public PageResponse<PublicPropertyDTO> listPublicProperties(
@@ -45,16 +85,29 @@ public class PropertyService {
             int page,
             int size
     ) {
-        Specification<Property> spec = publicListingSpec(city, type, priceMin, priceMax);
         int p = Math.max(0, page);
         int s = Math.min(100, Math.max(1, size));
+        String cacheKey = "listing:public:list:v1:"
+                + (city == null ? "" : city.trim().toLowerCase())
+                + "|" + (type == null ? "" : type.trim().toUpperCase())
+                + "|" + (priceMin == null ? "" : priceMin.toPlainString())
+                + "|" + (priceMax == null ? "" : priceMax.toPlainString())
+                + "|" + p + "|" + s;
+        Optional<PageResponse<PublicPropertyDTO>> cached = readPublicListingCache(cacheKey);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+
+        Specification<Property> spec = publicListingSpec(city, type, priceMin, priceMax);
         Page<Property> result = propertyRepository.findAll(
                 spec,
                 PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "createdAt"))
         );
         List<PublicPropertyDTO> content =
                 result.getContent().stream().map(propertyListingAssembler::toPublicDto).toList();
-        return new PageResponse<>(content, result.getNumber(), result.getSize(), result.getTotalElements());
+        PageResponse<PublicPropertyDTO> out = new PageResponse<>(content, result.getNumber(), result.getSize(), result.getTotalElements());
+        writePublicListingCache(cacheKey, out);
+        return out;
     }
 
     @Transactional(readOnly = true)
@@ -83,13 +136,24 @@ public class PropertyService {
         };
         int p = Math.max(0, page);
         int s = Math.min(100, Math.max(1, size));
+        String cacheKey = "listing:public:search:v1:"
+                + query.toLowerCase()
+                + "|" + (city == null ? "" : city.trim().toLowerCase())
+                + "|" + p + "|" + s;
+        Optional<PageResponse<PublicPropertyDTO>> cached = readPublicListingCache(cacheKey);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+
         Page<Property> result = propertyRepository.findAll(
                 spec,
                 PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "createdAt"))
         );
         List<PublicPropertyDTO> content =
                 result.getContent().stream().map(propertyListingAssembler::toPublicDto).toList();
-        return new PageResponse<>(content, result.getNumber(), result.getSize(), result.getTotalElements());
+        PageResponse<PublicPropertyDTO> out = new PageResponse<>(content, result.getNumber(), result.getSize(), result.getTotalElements());
+        writePublicListingCache(cacheKey, out);
+        return out;
     }
 
     @Transactional(readOnly = true)
@@ -105,6 +169,14 @@ public class PropertyService {
         };
         int p = Math.max(0, page);
         int s = Math.min(100, Math.max(1, size));
+        String cacheKey = "listing:public:featured:v1:"
+                + (city == null ? "" : city.trim().toLowerCase())
+                + "|" + p + "|" + s;
+        Optional<PageResponse<PublicPropertyDTO>> cached = readPublicListingCache(cacheKey);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+
         Page<Property> result = propertyRepository.findAll(
                 spec,
                 // Home should surface newly-approved listings; use recency first.
@@ -117,7 +189,9 @@ public class PropertyService {
         );
         List<PublicPropertyDTO> content =
                 result.getContent().stream().map(propertyListingAssembler::toPublicDto).toList();
-        return new PageResponse<>(content, result.getNumber(), result.getSize(), result.getTotalElements());
+        PageResponse<PublicPropertyDTO> out = new PageResponse<>(content, result.getNumber(), result.getSize(), result.getTotalElements());
+        writePublicListingCache(cacheKey, out);
+        return out;
     }
 
     @Transactional(readOnly = true)
@@ -179,13 +253,18 @@ public class PropertyService {
                 parts.add(cb.equal(cb.lower(root.get("city")), city.trim().toLowerCase()));
             }
             if (StringUtils.hasText(type)) {
-                PropertyType propertyType;
-                try {
-                    propertyType = PropertyType.valueOf(type.trim().toUpperCase());
-                } catch (IllegalArgumentException e) {
-                    throw new AppException(400, "INVALID_PROPERTY_TYPE");
+                String t = type.trim().toUpperCase();
+                if ("RENT".equals(t)) {
+                    parts.add(root.get("type").in(PropertyType.RENT_HOME, PropertyType.RENT_COMMERCIAL));
+                } else {
+                    PropertyType propertyType;
+                    try {
+                        propertyType = PropertyType.valueOf(t);
+                    } catch (IllegalArgumentException e) {
+                        throw new AppException(400, "INVALID_PROPERTY_TYPE");
+                    }
+                    parts.add(cb.equal(root.get("type"), propertyType));
                 }
-                parts.add(cb.equal(root.get("type"), propertyType));
             }
             if (priceMin != null && priceMax != null) {
                 parts.add(cb.lessThanOrEqualTo(root.get("priceMin"), priceMax));

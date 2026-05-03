@@ -2,15 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ListMyNest — brand tokens (PRD) */
-:root {
-  --lmn-primary: #e63946;
-  --lmn-dark: #1a1a2e;
-  --lmn-muted: #6b7280;
-  --lmn-card: #f8f9fa;
-  --lmn-verified: #2d6a4f;
-  --lmn-whatsapp: #25d366;
-}
+@import "./tokens.css";
+@import "@fontsource/inter/latin.css";
+@import "@fontsource/manrope/latin.css";
 
 *,
 *::before,
@@ -20,15 +14,44 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 body {
   margin: 0;
   min-height: 100dvh;
-  background-color: #ffffff;
-  color: #1a1a2e;
+  background: var(--bg);
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography helpers (mobile-app feel, consistent contrast) */
+.lmn-h1 {
+  font-family: Manrope, Inter, ui-sans-serif, system-ui, Segoe UI, Roboto,
+    sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-size: clamp(1.35rem, 1.1rem + 1.25vw, 1.75rem);
+  line-height: 1.15;
+}
+
+.lmn-h2 {
+  font-family: Manrope, Inter, ui-sans-serif, system-ui, Segoe UI, Roboto,
+    sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-size: clamp(1.05rem, 0.95rem + 0.6vw, 1.25rem);
+  line-height: 1.2;
 }
 
 img,
@@ -46,7 +69,12 @@ a {
   text-underline-offset: 0.15em;
 }
 
-:focus-visible {
-  outline: 2px solid #e63946;
+::focus-visible {
+  outline: 2px solid var(--lmn-primary);
   outline-offset: 2px;
 }
+
+::selection {
+  background: rgba(230, 57, 70, 0.22);
+}
+

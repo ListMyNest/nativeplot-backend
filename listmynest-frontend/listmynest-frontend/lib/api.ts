@@ -3,15 +3,53 @@ import { ensureSessionHash, getSessionHash } from "./session";
 import { useAuthStore } from "./store";
 import { showToast } from "./toast";
 
+/** Collapse mistaken `.../v1/v1/...` (common copy-paste) so Spring sees a single `/v1` prefix. */
+function collapseDuplicateApiVersionSegment(url: string): string {
+  let u = url;
+  while (u.includes("/v1/v1")) {
+    u = u.replaceAll("/v1/v1", "/v1");
+  }
+  return u;
+}
+
+/**
+ * Public API base ending with `/v1` (no trailing slash), or same-origin `/v1` when env is empty in the
+ * browser (Next.js rewrites `/v1/*` to the backend — avoids CORS and wrong host).
+ */
+function normalizePublicApiBaseUrl(raw: string | undefined): string {
+  const s = (raw ?? "").trim().replace(/\/+$/, "");
+  if (!s) {
+    return typeof window !== "undefined" ? "/v1" : "http://localhost:8080/v1";
+  }
+  if (s.startsWith("http://") || s.startsWith("https://")) {
+    let out = s;
+    if (!/\/v\d+$/i.test(out)) {
+      out = `${out}/v1`;
+    }
+    return collapseDuplicateApiVersionSegment(out);
+  }
+  let out = s.startsWith("/") ? s : `/${s}`;
+  if (!/\/v\d+$/i.test(out)) {
+    out = `${out.replace(/\/+$/, "")}/v1`;
+  }
+  return collapseDuplicateApiVersionSegment(out);
+}
+
 export const BASE_URL =
-  (typeof process !== "undefined" &&
-    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "")) ||
-  "http://localhost:8080/v1";
+  typeof process !== "undefined"
+    ? normalizePublicApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL)
+    : "http://localhost:8080/v1";
 
 /** API host without `/v1` — for resolving relative mock-upload / storage paths. */
 export function getApiOrigin(): string {
   const trimmed = BASE_URL.replace(/\/+$/, "");
-  return trimmed.replace(/\/v1$/i, "") || "http://localhost:8080";
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed.replace(/\/v1$/i, "") || "http://localhost:8080";
+  }
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  return "http://localhost:8080";
 }
 
 export function toAbsoluteAssetUrl(
@@ -373,6 +411,7 @@ export async function registerSellerAccount(data: {
   phone: string;
   password: string;
   preferredAgentId?: string | null;
+  isAgent?: boolean;
 }) {
   const raw = await apiFetch<Record<string, unknown>>("/auth/seller/register", {
     method: "POST",
@@ -515,11 +554,12 @@ function normalizeDetailPhotos(
 }
 
 export async function getPropertyDetail(
-  id: string
+  id: string,
+  opts?: { suppressErrorToast?: boolean }
 ): Promise<import("../types").PropertyDetail> {
   const raw = await apiFetch<Record<string, unknown>>(
     `/properties/${encodeURIComponent(id)}`,
-    { auth: "none" }
+    { auth: "none", suppressErrorToast: opts?.suppressErrorToast ?? false }
   );
   const base = normalizePropertyListItem(raw);
   const photosRaw = raw.photos;
@@ -583,14 +623,20 @@ export async function getPropertyDetail(
   };
 }
 
-export async function searchProperties(q: string, city?: string) {
+export async function searchProperties(
+  q: string,
+  city?: string,
+  listOpts?: { page?: number; size?: number; suppressErrorToast?: boolean }
+) {
   try {
     const qs = new URLSearchParams();
     qs.set("q", q);
     if (city) qs.set("city", city);
+    if (listOpts?.page != null) qs.set("page", String(listOpts.page));
+    if (listOpts?.size != null) qs.set("size", String(listOpts.size));
     const raw = await apiFetch<PageResponseRaw<Record<string, unknown>>>(
       `/properties/search?${qs.toString()}`,
-      { auth: "none" }
+      { auth: "none", suppressErrorToast: listOpts?.suppressErrorToast ?? false }
     );
     return toPaginatedProperties(raw);
   } catch (e) {
@@ -807,6 +853,90 @@ export function adminGetVisits(params?: { page?: number; size?: number }) {
   return apiFetch<PageResponseRaw<Record<string, unknown>>>(
     `/admin/visits${qs ? `?${qs}` : ""}`
   );
+}
+
+export function adminUpdateVisitStatus(
+  visitId: string,
+  body: { status: string; notes?: string | null }
+) {
+  return apiFetch<Record<string, unknown>>(
+    `/admin/visits/${encodeURIComponent(visitId)}/status`,
+    {
+      method: "PATCH",
+      body: {
+        status: body.status,
+        ...(body.notes != null && body.notes !== ""
+          ? { notes: body.notes }
+          : {}),
+      },
+    }
+  );
+}
+
+/** UTF-8 CSV with BOM — opens in Microsoft Excel. */
+export async function adminDownloadVisitsCsv(
+  params: { dateFrom: string; dateTo: string },
+  opts?: { token?: string | null }
+): Promise<{ blob: Blob; filename: string }> {
+  const qs = new URLSearchParams({
+    dateFrom: params.dateFrom,
+    dateTo: params.dateTo,
+  });
+  const token =
+    (opts?.token != null && String(opts.token).trim() !== ""
+      ? String(opts.token).trim()
+      : null) ??
+    getToken() ??
+    (typeof window !== "undefined" ? useAuthStore.getState().token : null);
+  const url = `${BASE_URL}/admin/export/visits?${qs.toString()}`;
+  const res = await fetch(url, {
+    method: "GET",
+    mode: "cors",
+    cache: "no-store",
+    headers: {
+      Accept: "text/csv,application/octet-stream,*/*",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let message = text.trim() || `Export failed (${res.status})`;
+    try {
+      const j = JSON.parse(text) as { message?: string };
+      if (j && typeof j.message === "string" && j.message.trim()) {
+        message = j.message.trim();
+      }
+    } catch {
+      /* plain text or HTML */
+    }
+    if (res.status === 401 || res.status === 403) {
+      useAuthStore.getState().logout();
+      if (typeof window !== "undefined") {
+        window.location.href = "/admin/login";
+      }
+    }
+    throw new ApiError(res.status, text, message);
+  }
+  const blob = await res.blob();
+  const defaultName = `listmynest_visits_${params.dateFrom}_to_${params.dateTo}.csv`;
+  let filename = defaultName;
+  const cd = res.headers.get("Content-Disposition");
+  if (cd) {
+    const utf8 = /filename\*=UTF-8''([^;\s]+)/i.exec(cd);
+    const quoted = /filename="([^"]+)"/i.exec(cd);
+    const plain = /filename=([^;\s"]+)/i.exec(cd);
+    const raw = utf8?.[1] ?? quoted?.[1] ?? plain?.[1];
+    if (raw) {
+      try {
+        filename = decodeURIComponent(raw.replace(/"/g, ""));
+      } catch {
+        filename = raw.replace(/"/g, "");
+      }
+    }
+  }
+  const safe =
+    filename.trim().endsWith(".csv") ? filename.trim() : `${filename.trim()}.csv`;
+  return { blob, filename: safe };
 }
 
 export function adminGetProperties(params?: Record<string, string | number>) {

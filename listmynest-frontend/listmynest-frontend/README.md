@@ -20,6 +20,29 @@ npm run dev
 - Set `NEXT_PUBLIC_API_BASE_URL` in `.env.local` (default is `http://localhost:8080/v1`).
 - If you use Supabase signed image URLs, set `NEXT_PUBLIC_SUPABASE_URL` so Next Image can load remote images.
 
+## Environment variables (frontend)
+
+Create `listmynest-frontend/listmynest-frontend/.env.local` from `.env.example`.
+
+- **Required**
+  - `NEXT_PUBLIC_API_BASE_URL`: Backend base URL ending with `/v1` (e.g. `http://localhost:8080/v1`)
+- **Recommended**
+  - `NEXT_PUBLIC_SUPABASE_URL`: Used to allow remote images from your Supabase Storage domain
+- **Optional**
+  - `NEXT_PUBLIC_ENQUIRY_PHONE`: Phone used for homepage Call/WhatsApp CTAs
+  - `NEXT_PUBLIC_FALLBACK_BUYER_CONTACT_PHONE`: Used if `NEXT_PUBLIC_ENQUIRY_PHONE` is not set
+  - `NEXT_PUBLIC_FIREBASE_*`: Public Firebase web config (only needed if you enable phone auth UI)
+
+## Bundle analysis
+
+Run:
+
+```bash
+npm run analyze
+```
+
+This generates bundle analyzer output (enabled via `ANALYZE=true`).
+
 ### Backend
 
 ```bash

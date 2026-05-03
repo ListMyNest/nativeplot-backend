@@ -19,6 +19,8 @@ import { useAuthStore } from "../../../lib/store";
 import { showToast } from "../../../lib/toast";
 import { formatPriceRangeLakh } from "../../../lib/utils/formatPrice";
 import type { PropertyListItem } from "../../../types";
+import { Card } from "../../../components/ui/Card";
+import { Button } from "../../../components/ui/Button";
 
 function num(v: unknown): number {
   if (typeof v === "number") return v;
@@ -32,15 +34,15 @@ function num(v: unknown): number {
 function statusBadgeClass(st: string) {
   switch (st) {
     case "ACTIVE":
-      return "bg-emerald-100 text-emerald-800";
+      return "bg-success/15 text-success";
     case "PENDING_REVIEW":
-      return "bg-amber-100 text-amber-900";
+      return "bg-warning/20 text-text";
     case "PAUSED":
-      return "bg-gray-200 text-gray-800";
+      return "bg-surface2 text-text";
     case "SOLD":
-      return "bg-red-100 text-red-800";
+      return "bg-danger/15 text-danger";
     default:
-      return "bg-lmn-card text-lmn-dark";
+      return "bg-surface2 text-text";
   }
 }
 
@@ -131,7 +133,7 @@ export default function SellerDashboardPage() {
 
   if (!token || String(role).toUpperCase() !== "SELLER") {
     return (
-      <div className="flex min-h-[40dvh] items-center justify-center text-sm text-lmn-muted">
+      <div className="flex min-h-[40dvh] items-center justify-center text-sm text-muted">
         Redirecting…
       </div>
     );
@@ -139,66 +141,60 @@ export default function SellerDashboardPage() {
 
   return (
     <AppDashboardChrome variant="seller">
-    <div className="min-h-[100dvh] pb-28 lg:pb-10">
-      <header className="border-b border-lmn-border bg-white px-4 py-6 sm:px-6 md:px-8">
+      <div className="min-h-[100dvh] pb-28 lg:pb-10">
+      <header className="border-b border-border bg-surface/80 px-4 py-6 shadow-sm backdrop-blur sm:px-6 md:px-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-sm font-medium text-lmn-muted">Seller</p>
-            <h1 className="text-2xl font-extrabold text-lmn-dark">
+            <p className="text-sm font-medium text-muted">Seller</p>
+            <h1 className="font-heading text-2xl font-extrabold text-text">
               Welcome back, {sellerName}
             </h1>
-            <span className="mt-2 inline-block rounded-full bg-lmn-verified/15 px-3 py-1 text-xs font-semibold text-lmn-verified">
+            <span className="mt-2 inline-block rounded-full bg-success/15 px-3 py-1 text-xs font-semibold text-success">
               Active account
             </span>
           </div>
           <Link
             href="/seller/add-listing"
-            className="flex min-h-[48px] w-full items-center justify-center rounded-xl bg-lmn-primary text-sm font-extrabold text-white sm:w-auto sm:min-w-[200px]"
+            className="flex min-h-[48px] w-full items-center justify-center rounded-xl bg-lmn-primary text-sm font-extrabold text-white shadow-sm transition-[transform,box-shadow] duration-fast hover:shadow-md active:scale-[0.98] sm:w-auto sm:min-w-[200px]"
           >
             + Add New Property
           </Link>
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-            <p className="text-2xl font-extrabold text-blue-900">
+          <Card className="bg-surface">
+            <p className="text-2xl font-extrabold text-text">
               {statListings || listings.length}
             </p>
-            <p className="text-sm font-medium text-blue-800">Total Listings</p>
-          </div>
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-            <p className="text-2xl font-extrabold text-emerald-900">
-              {statEnq}
-            </p>
-            <p className="text-sm font-medium text-emerald-800">
-              Total Enquiries
-            </p>
-          </div>
-          <div className="rounded-xl border border-orange-200 bg-orange-50 p-4">
-            <p className="text-2xl font-extrabold text-orange-900">
-              {statVisits}
-            </p>
-            <p className="text-sm font-medium text-orange-800">Total Visits</p>
-          </div>
+            <p className="text-sm font-medium text-muted">Total Listings</p>
+          </Card>
+          <Card className="bg-surface">
+            <p className="text-2xl font-extrabold text-text">{statEnq}</p>
+            <p className="text-sm font-medium text-muted">Total Enquiries</p>
+          </Card>
+          <Card className="bg-surface">
+            <p className="text-2xl font-extrabold text-text">{statVisits}</p>
+            <p className="text-sm font-medium text-muted">Total Visits</p>
+          </Card>
         </div>
       </header>
 
       <div className="mx-auto max-w-4xl space-y-8 px-4 py-6 sm:px-6 md:px-8">
         {error ? (
-          <p className="rounded-xl border border-lmn-primary/30 bg-red-50 px-4 py-3 text-sm text-lmn-primary">
+          <p className="rounded-xl border border-danger/25 bg-surface px-4 py-3 text-sm text-danger shadow-sm">
             {error}
           </p>
         ) : null}
 
-        <section className="rounded-2xl border border-lmn-border bg-white p-4 shadow-sm">
-          <h2 className="text-lg font-extrabold text-lmn-dark">
+        <section className="rounded-2xl border-2 border-border bg-surface p-4 shadow-md">
+          <h2 className="font-heading text-lg font-extrabold text-text">
             Visit requests
           </h2>
-          <p className="mt-1 text-xs text-lmn-muted">
+          <p className="mt-1 text-xs text-muted">
             Bookings from buyers appear here as soon as they submit a slot.
           </p>
           {!loading && visits.length === 0 ? (
-            <p className="mt-3 text-sm text-lmn-muted">No visits yet.</p>
+            <p className="mt-3 text-sm text-muted">No visits yet.</p>
           ) : null}
           {!loading && visits.length > 0 ? (
             <ul className="mt-3 space-y-2">
@@ -214,10 +210,10 @@ export default function SellerDashboardPage() {
                 return (
                   <li
                     key={id}
-                    className="rounded-xl border border-lmn-border bg-lmn-card px-3 py-2 text-sm"
+                    className="rounded-xl border border-border bg-surface2 px-3 py-2 text-sm"
                   >
-                    <p className="font-semibold text-lmn-dark">{title}</p>
-                    <p className="text-xs text-lmn-muted">
+                    <p className="font-semibold text-text">{title}</p>
+                    <p className="text-xs text-muted">
                       {d} · {t} · {phone}
                     </p>
                     {st ? (
@@ -233,18 +229,18 @@ export default function SellerDashboardPage() {
         </section>
 
         {leadSummary ? (
-          <section className="rounded-2xl border border-lmn-border bg-white p-4 shadow-sm">
-            <h2 className="text-lg font-extrabold text-lmn-dark">
+          <section className="rounded-2xl border-2 border-border bg-surface p-4 shadow-md">
+            <h2 className="font-heading text-lg font-extrabold text-text">
               Recent enquiry mix
             </h2>
-            <p className="mt-2 text-sm text-lmn-muted">
+            <p className="mt-2 text-sm text-muted">
               WhatsApp leads:{" "}
               {num(leadSummary.waLeads ?? leadSummary.wa_leads)} · Call clicks:{" "}
               {num(leadSummary.callLeads ?? leadSummary.call_leads)} · Visit
               requests:{" "}
               {num(leadSummary.visitRequests ?? leadSummary.visit_requests)}
             </p>
-            <p className="mt-2 text-xs text-lmn-muted">
+            <p className="mt-2 text-xs text-muted">
               For visit requests, call buyers back from your registered number
               within the hour when possible.
             </p>
@@ -252,7 +248,7 @@ export default function SellerDashboardPage() {
         ) : null}
 
         <section>
-          <h2 className="mb-3 text-lg font-extrabold text-lmn-dark">
+          <h2 className="font-heading mb-3 text-lg font-extrabold text-text">
             My listings
           </h2>
           {loading ? (
@@ -260,12 +256,12 @@ export default function SellerDashboardPage() {
               {[1, 2].map((k) => (
                 <div
                   key={k}
-                  className="h-40 animate-pulse rounded-2xl bg-lmn-card"
+                  className="h-40 animate-pulse rounded-2xl bg-surface2"
                 />
               ))}
             </div>
           ) : listings.length === 0 ? (
-            <p className="text-sm text-lmn-muted">No listings yet.</p>
+            <p className="text-sm text-muted">No listings yet.</p>
           ) : (
             <ul className="grid gap-4 sm:grid-cols-2">
               {listings.map((listing) => {
@@ -277,9 +273,9 @@ export default function SellerDashboardPage() {
                 return (
                   <li
                     key={listing.id}
-                    className="overflow-hidden rounded-2xl border border-lmn-border bg-white shadow-sm transition-shadow hover:shadow-md"
+                    className="overflow-hidden rounded-3xl border-2 border-border bg-surface shadow-md transition-[transform,box-shadow] duration-base hover:-translate-y-1 hover:shadow-lg"
                   >
-                    <div className="relative aspect-video bg-lmn-card">
+                    <div className="relative aspect-video bg-surface2">
                       {listing.primary_photo ? (
                         <PropertyRemoteImage
                           src={
@@ -292,14 +288,14 @@ export default function SellerDashboardPage() {
                           className="size-full"
                         />
                       ) : (
-                        <div className="flex size-full items-center justify-center text-3xl text-lmn-muted">
+                        <div className="flex size-full items-center justify-center text-3xl text-muted">
                           🏠
                         </div>
                       )}
                     </div>
-                    <div className="p-4">
+                    <div className="p-5">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="line-clamp-2 font-bold text-lmn-dark">
+                        <p className="line-clamp-2 text-base font-extrabold text-text">
                           {listing.title}
                         </p>
                         <span
@@ -308,39 +304,42 @@ export default function SellerDashboardPage() {
                           {st.replace(/_/g, " ")}
                         </span>
                       </div>
-                      <p className="mt-1 font-extrabold text-lmn-primary">
+                      <p className="mt-1 text-base font-extrabold text-lmn-primary">
                         {price}
                       </p>
-                      <p className="text-xs text-lmn-muted">
+                      <p className="text-xs text-muted">
                         {listing.view_count} views · {listing.locality},{" "}
                         {listing.city}
                       </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="mt-4 flex flex-wrap gap-2">
                         {st === "ACTIVE" ? (
-                          <button
-                            type="button"
+                          <Button
+                            variant="outline"
+                            size="sm"
                             disabled={actionId === listing.id}
                             onClick={() =>
                               void runStatus(listing.id, "PAUSED", "Pause?")
                             }
-                            className="min-h-[40px] flex-1 rounded-lg border border-lmn-border text-xs font-semibold text-lmn-dark disabled:opacity-50"
+                            className="min-h-[40px] flex-1"
                           >
                             Pause
-                          </button>
+                          </Button>
                         ) : null}
                         {st === "PAUSED" ? (
-                          <button
-                            type="button"
+                          <Button
+                            variant="secondary"
+                            size="sm"
                             disabled={actionId === listing.id}
                             onClick={() => void runStatus(listing.id, "ACTIVE")}
-                            className="min-h-[40px] flex-1 rounded-lg bg-lmn-verified/15 text-xs font-semibold text-lmn-verified disabled:opacity-50"
+                            className="min-h-[40px] flex-1 text-success"
                           >
                             Activate
-                          </button>
+                          </Button>
                         ) : null}
                         {st !== "SOLD" ? (
-                          <button
-                            type="button"
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             disabled={actionId === listing.id}
                             onClick={() =>
                               void runStatus(
@@ -349,10 +348,10 @@ export default function SellerDashboardPage() {
                                 "Mark this listing as sold?"
                               )
                             }
-                            className="min-h-[40px] flex-1 rounded-lg bg-lmn-primary/10 text-xs font-semibold text-lmn-primary disabled:opacity-50"
+                            className="min-h-[40px] flex-1 bg-lmn-primary/10 text-lmn-primary hover:bg-lmn-primary/15"
                           >
                             Mark Sold
-                          </button>
+                          </Button>
                         ) : null}
                       </div>
                     </div>
@@ -369,7 +368,7 @@ export default function SellerDashboardPage() {
             logout();
             router.replace("/seller/login");
           }}
-          className="min-h-[48px] text-sm font-semibold text-lmn-muted underline"
+          className="min-h-[48px] text-sm font-semibold text-muted underline decoration-border underline-offset-4 hover:text-text"
         >
           Log out
         </button>

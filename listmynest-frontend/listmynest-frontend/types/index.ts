@@ -352,6 +352,9 @@ export type PatchAdminAgentPayload = Partial<
 export type CreateAdminSellerPayload = {
   name: string;
   phone: string;
+  password?: string;
+  preferredAgentId?: string | null;
+  isAgent?: boolean;
 };
 
 export type AdminAuditLogQuery = {

@@ -120,7 +120,7 @@ export default function AccountPage() {
 
     return (
       <main className="mx-auto max-w-lg space-y-6 py-8">
-        <div className="flex items-start gap-4 rounded-2xl border border-lmn-border bg-white p-4 shadow-sm">
+        <div className="flex items-start gap-4 rounded-2xl border-2 border-lmn-border bg-white p-4 shadow-md">
           <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-lmn-primary text-lg font-extrabold text-white">
             {initials}
           </div>
@@ -159,7 +159,7 @@ export default function AccountPage() {
             </p>
           </div>
         ) : null}
-        <nav className="space-y-1 rounded-2xl border border-lmn-border bg-white p-2 shadow-sm">
+        <nav className="space-y-1 rounded-2xl border-2 border-lmn-border bg-white p-2 shadow-md">
           <MenuRow href="/seller/dashboard" label="📋 My Listings" />
           <MenuRow href="/seller/add-listing" label="➕ Add Property" />
           <MenuRow href="#" label="📊 Analytics" muted />
@@ -195,7 +195,7 @@ export default function AccountPage() {
 
     return (
       <main className="mx-auto max-w-lg space-y-6 py-8">
-        <div className="flex items-start gap-4 rounded-2xl border border-lmn-border bg-white p-4 shadow-sm">
+        <div className="flex items-start gap-4 rounded-2xl border-2 border-lmn-border bg-white p-4 shadow-md">
           <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-lmn-verified text-lg font-extrabold text-white">
             {initials}
           </div>
@@ -221,7 +221,7 @@ export default function AccountPage() {
             </div>
           ))}
         </div>
-        <nav className="space-y-1 rounded-2xl border border-lmn-border bg-white p-2 shadow-sm">
+        <nav className="space-y-1 rounded-2xl border-2 border-lmn-border bg-white p-2 shadow-md">
           <MenuRow href="/agent/dashboard" label="📋 My Leads" />
           <MenuRow href="/agent/dashboard" label="📅 Visit Schedule" />
           <MenuRow href="#" label="🔔 Notifications" muted />
@@ -241,13 +241,13 @@ export default function AccountPage() {
   if (r === "ADMIN") {
     return (
       <main className="mx-auto max-w-lg space-y-6 py-8">
-        <div className="rounded-2xl border border-lmn-border bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border-2 border-lmn-border bg-white p-4 shadow-md">
           <span className="rounded-full bg-lmn-dark px-3 py-1 text-xs font-bold text-white">
             Admin Portal
           </span>
           <p className="mt-3 font-extrabold text-lmn-dark">{userName}</p>
         </div>
-        <nav className="space-y-1 rounded-2xl border border-lmn-border bg-white p-2 shadow-sm">
+        <nav className="space-y-1 rounded-2xl border-2 border-lmn-border bg-white p-2 shadow-md">
           <MenuRow href="/admin/dashboard" label="📊 Dashboard" />
           <MenuRow href="/admin/dashboard" label="🏠 Manage Listings" />
           <MenuRow href="/admin/dashboard" label="👥 Manage Agents" />

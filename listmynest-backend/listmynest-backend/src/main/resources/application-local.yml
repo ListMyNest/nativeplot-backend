@@ -13,6 +13,9 @@ listmynest:
     postgres: ${LISTMYNEST_EMBEDDED_POSTGRES:false}
     # 0 = let embedded Postgres pick a free port (recommended; avoids "address already in use" on 5433).
     postgres-port: 0
+  # Local: keep listing cache off so edits show immediately; enable in prod via env / application.yml.
+  cache:
+    public-listings-ttl-seconds: ${LISTMYNEST_CACHE_PUBLIC_LISTINGS_TTL:0}
 
 spring:
   datasource:

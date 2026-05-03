@@ -20,13 +20,13 @@ export default function Home() {
           <div className="mb-3 flex items-end justify-between gap-3">
             <h2
               id="featured-properties-heading"
-              className="text-lg font-extrabold leading-tight text-lmn-dark"
+              className="font-heading text-lg font-extrabold leading-tight text-text"
             >
               Featured Properties
             </h2>
             <Link
               href="/listings"
-              className="shrink-0 rounded text-sm font-semibold text-lmn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lmn-primary focus-visible:ring-offset-2"
+              className="shrink-0 rounded text-sm font-semibold text-lmn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
             >
               View All
             </Link>

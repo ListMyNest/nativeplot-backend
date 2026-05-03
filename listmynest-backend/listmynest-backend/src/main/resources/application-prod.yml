@@ -1,0 +1,31 @@
+# Baked-in defaults when spring.profiles.active=prod (no secrets here).
+# Set secrets via environment / application.yml on the server.
+#
+# Start the API with: --spring.profiles.active=prod
+# or: SPRING_PROFILES_ACTIVE=prod
+
+spring:
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    root: INFO
+    com.listmynest: INFO
+    org.springframework.web: WARN
+    org.hibernate: WARN
+
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  health:
+    defaults:
+      enabled: true

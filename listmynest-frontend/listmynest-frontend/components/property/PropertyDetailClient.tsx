@@ -25,6 +25,8 @@ import { useSessionStore } from "../../store/sessionStore";
 import { digitsToIndiaE164, isTenIndiaDigits } from "../../lib/phone";
 import { formatPriceRangeLakh } from "../../lib/utils/formatPrice";
 import type { PropertyDetail } from "../../types";
+import { Skeleton } from "../ui/Skeleton";
+import { Button } from "../ui/Button";
 
 function telHref(e164: string): string {
   const t = e164.trim();
@@ -107,6 +109,7 @@ function mapBuyerActionError(e: unknown, fallback: string): string {
 function typeLabel(type: PropertyDetail["type"]): string {
   const t = String(type).toUpperCase();
   if (t === "PLOT" || t === "PLOTS") return "Plot";
+  if (t === "RENT" || t.startsWith("RENT_")) return "Rent";
   if (t === "RESIDENTIAL") return "Residential";
   if (t === "COMMERCIAL") return "Commercial";
   if (t === "AGRICULTURAL") return "Agricultural";
@@ -505,8 +508,8 @@ export function PropertyDetailClient({ propertyId }: PropertyDetailClientProps) 
 
   if (loadError) {
     return (
-      <div className="min-h-[100dvh] bg-white px-4 py-10 text-center">
-        <p className="text-sm text-lmn-primary">{loadError}</p>
+      <div className="min-h-[100dvh] bg-bg px-4 py-10 text-center">
+        <p className="text-sm text-danger">{loadError}</p>
         <Link
           href="/"
           className="mt-4 inline-block text-sm font-semibold text-lmn-primary"
@@ -519,11 +522,11 @@ export function PropertyDetailClient({ propertyId }: PropertyDetailClientProps) 
 
   if (!property) {
     return (
-      <div className="min-h-[100dvh] bg-white px-4 py-10">
+      <div className="min-h-[100dvh] bg-bg px-4 py-10">
         <div className="mx-auto max-w-3xl space-y-3">
-          <div className="h-48 animate-pulse rounded-2xl bg-lmn-card" />
-          <div className="h-6 w-2/3 animate-pulse rounded bg-lmn-card" />
-          <div className="h-24 animate-pulse rounded-xl bg-lmn-card" />
+          <Skeleton className="h-48 rounded-2xl" />
+          <Skeleton className="h-6 w-2/3" />
+          <Skeleton className="h-24 rounded-xl" />
         </div>
       </div>
     );
@@ -560,29 +563,25 @@ export function PropertyDetailClient({ propertyId }: PropertyDetailClientProps) 
     geoCoords != null;
 
   return (
-    <div className="min-h-[100dvh] bg-white pb-36 lg:pb-10">
-      <header className="sticky top-14 z-30 flex items-center gap-2 border-b border-lmn-border bg-white px-4 py-3 sm:top-[3.75rem]">
+    <div className="min-h-[100dvh] bg-bg pb-36 lg:pb-10">
+      <header className="sticky top-14 z-30 flex items-center gap-2 border-b border-border bg-surface/85 px-4 py-3 shadow-sm backdrop-blur sm:top-[3.75rem]">
         <Link
           href="/"
-          className="flex size-12 min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-xl bg-lmn-card text-lg font-bold text-lmn-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lmn-primary focus-visible:ring-offset-2"
+          className="flex size-12 min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-lg font-bold text-text shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           aria-label="Back to home"
         >
           ←
         </Link>
-        <h1 className="min-w-0 flex-1 truncate text-sm font-bold leading-snug text-lmn-dark">
+        <h1 className="min-w-0 flex-1 truncate text-sm font-extrabold leading-snug text-text">
           {property.title}
         </h1>
-        <button
-          type="button"
-          onClick={onSaveClick}
-          className="shrink-0 rounded-xl bg-lmn-card px-3 py-2 text-xs font-semibold text-lmn-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lmn-primary"
-        >
+        <Button variant="secondary" size="sm" onClick={onSaveClick}>
           Save
-        </button>
+        </Button>
         <button
           type="button"
           onClick={() => void share()}
-          className="flex size-12 min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-xl bg-lmn-card text-base text-lmn-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lmn-primary"
+          className="flex size-12 min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-base text-text shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           aria-label="Share"
         >
           📤

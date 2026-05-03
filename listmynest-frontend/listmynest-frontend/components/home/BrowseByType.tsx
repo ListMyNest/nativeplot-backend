@@ -8,10 +8,9 @@ const CATEGORIES: {
   value: string | null;
 }[] = [
   { emoji: "🏠", label: "All", value: null },
-  { emoji: "🏘", label: "Residential", value: "RESIDENTIAL" },
   { emoji: "🏗", label: "Plots", value: "PLOT" },
-  { emoji: "🏢", label: "Commercial", value: "COMMERCIAL" },
   { emoji: "🌾", label: "Agricultural", value: "AGRICULTURAL" },
+  { emoji: "🔑", label: "Rent", value: "RENT" },
 ];
 
 export function BrowseByType() {
@@ -22,7 +21,7 @@ export function BrowseByType() {
     <section className="px-4 sm:px-6" aria-labelledby="browse-type-heading">
       <h2
         id="browse-type-heading"
-        className="mb-3 text-base font-extrabold text-lmn-dark"
+        className="lmn-h2 mb-3 text-text"
       >
         Browse By Type
       </h2>
@@ -43,8 +42,8 @@ export function BrowseByType() {
               onClick={() => setPropertyType(value)}
               className={
                 active
-                  ? "shrink-0 rounded-full bg-lmn-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lmn-primary focus-visible:ring-offset-2"
-                  : "shrink-0 rounded-full border border-lmn-border bg-white px-4 py-2.5 text-sm font-medium text-lmn-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lmn-primary focus-visible:ring-offset-2"
+                  ? "shrink-0 rounded-full bg-lmn-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                  : "shrink-0 rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-medium text-text shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
               }
             >
               <span className="mr-1.5" aria-hidden>

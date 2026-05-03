@@ -262,8 +262,26 @@ public class AuthService {
 
     @Transactional
     public AuthResponse registerSeller(CreateSellerRequest req) {
-        if (sellerRepository.existsByPhone(req.phone())) {
+        if (sellerRepository.existsByPhone(req.phone()) || agentRepository.existsByPhone(req.phone())) {
             throw new AppException(409, "PHONE_IN_USE");
+        }
+        boolean asAgent = Boolean.TRUE.equals(req.isAgent());
+        if (asAgent) {
+            Agent agent = Agent.builder()
+                    .name(req.name().trim())
+                    .phone(req.phone())
+                    .whatsappNumber(req.phone())
+                    .passwordHash(passwordEncoder.encode(req.password()))
+                    .active(true)
+                    .build();
+            agent = agentRepository.save(agent);
+            String token = jwtService.generateToken(agent.getId(), "AGENT", java.util.Map.of());
+            log.info(
+                    "AGENT_SELF_REGISTERED id={} phone={}",
+                    agent.getId(),
+                    LogMaskUtil.maskPhone(req.phone())
+            );
+            return new AuthResponse(token, "AGENT", agent.getId(), agent.getName());
         }
         Agent preferred = null;
         if (req.preferredAgentId() != null) {

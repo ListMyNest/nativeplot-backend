@@ -3,6 +3,14 @@
 
 server:
   port: ${SERVER_PORT:8080}
+  # When behind Nginx/Caddy, trust X-Forwarded-* for client IP (used by IP rate limits).
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:framework}
+  tomcat:
+    threads:
+      max: ${TOMCAT_MAX_THREADS:200}
+      min-spare: ${TOMCAT_MIN_SPARE_THREADS:10}
+    accept-count: ${TOMCAT_ACCEPT_COUNT:100}
+    max-connections: ${TOMCAT_MAX_CONNECTIONS:8000}
 
 spring:
   datasource:
@@ -10,6 +18,13 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:postgres.YOUR_PROJECT_REF}
     password: ${SPRING_DATASOURCE_PASSWORD:YOUR_SUPABASE_DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: listmynest-pg
+      maximum-pool-size: ${HIKARI_MAXIMUM_POOL_SIZE:20}
+      minimum-idle: ${HIKARI_MINIMUM_IDLE:5}
+      connection-timeout: ${HIKARI_CONNECTION_TIMEOUT_MS:20000}
+      idle-timeout: ${HIKARI_IDLE_TIMEOUT_MS:600000}
+      max-lifetime: ${HIKARI_MAX_LIFETIME_MS:1800000}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -50,8 +65,15 @@ wati:
   base-url: ${WATI_BASE_URL:https://live-server.wati.io}
   webhook-secret: ${WATI_WEBHOOK_SECRET:}
 
+# Comma-separated browser origins. Production: https://www.yourdomain.com,https://yourdomain.com
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+# --- Production profile (see also src/main/resources/application-prod.yml) ---
+# Run with: SPRING_PROFILES_ACTIVE=prod
+# - Restricts /actuator to health (see SecurityConfig) and hides OpenAPI/Swagger from the internet.
+# - Set CORS_ALLOWED_ORIGINS to your real site + optional preview URLs.
+# - Set JWT_SECRET to a long random value; never use the example placeholder.
 
 app:
   base-url: ${APP_BASE_URL:http://localhost:8080}
@@ -62,3 +84,22 @@ app:
 listmynest:
   embedded:
     postgres: ${LISTMYNEST_EMBEDDED_POSTGRES:false}
+  # Redis-backed caches (TTL 0 = disabled). Short TTL on listings reduces DB load; invalidate implicitly via TTL.
+  cache:
+    public-listings-ttl-seconds: ${LISTMYNEST_CACHE_PUBLIC_LISTINGS_TTL:30}
+    geocode-ttl-seconds: ${LISTMYNEST_CACHE_GEOCODE_TTL:604800}
+  http:
+    client:
+      connect-timeout-ms: ${LISTMYNEST_HTTP_CONNECT_TIMEOUT_MS:5000}
+      read-timeout-ms: ${LISTMYNEST_HTTP_READ_TIMEOUT_MS:15000}
+  rate-limit:
+    ip:
+      # Master switch for {@link com.listmynest.config.PublicWriteIpRateLimitFilter}.
+      enabled: ${LISTMYNEST_RATE_LIMIT_IP_ENABLED:true}
+      post-leads-per-hour: ${LISTMYNEST_RL_IP_LEADS_PER_HOUR:200}
+      post-visits-per-hour: ${LISTMYNEST_RL_IP_VISITS_PER_HOUR:120}
+      post-notify-me-per-hour: ${LISTMYNEST_RL_IP_NOTIFY_PER_HOUR:40}
+      admin-login-per-15m: ${LISTMYNEST_RL_IP_ADMIN_LOGIN_PER_15M:40}
+      admin-register-per-hour: ${LISTMYNEST_RL_IP_ADMIN_REG_PER_HOUR:20}
+      otp-send-per-hour: ${LISTMYNEST_RL_IP_OTP_SEND_PER_HOUR:40}
+      password-login-per-hour: ${LISTMYNEST_RL_IP_PASSWORD_LOGIN_PER_HOUR:80}

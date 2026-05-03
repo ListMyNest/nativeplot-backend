@@ -254,7 +254,7 @@ public class AdminService {
 
     @Transactional
     public AdminSellerDTO createSeller(CreateSellerRequest req, UUID adminId) {
-        if (sellerRepository.existsByPhone(req.phone())) {
+        if (sellerRepository.existsByPhone(req.phone()) || agentRepository.existsByPhone(req.phone())) {
             throw new AppException(409, "PHONE_IN_USE");
         }
         Agent preferred = null;

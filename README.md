@@ -38,6 +38,17 @@ Two apps in one folder:
 
 More detail: **`listmynest-backend/listmynest-backend/README.md`** and **`listmynest-frontend/listmynest-frontend/README.md`**.
 
+## Production / scaling (India, single VM, high concurrency)
+
+- **Launch checklist, domain, GitHub workflow, maintenance:** **`docs/DEPLOY_AND_MAINTAIN.md`**
+- **Database:** use **managed PostgreSQL** in production; same-VM Postgres is only for low traffic or staging—see **`docs/PRODUCTION_DEPLOYMENT.md`**.
+- **Ops (Nginx, systemd, monitoring, backups):** same doc.
+- **CI:** **`.github/workflows/ci.yml`** (Gradle test + Next lint on push/PR).
+- **Load tests:** **`loadtest/README.md`** (k6).
+- **Benchmark template / results:** **`docs/BENCHMARK_REPORT.md`**.
+
+**API in production:** set `SPRING_PROFILES_ACTIVE=prod` to restrict Swagger and actuator (health remains public; see `SecurityConfig` and `application-prod.yml`).
+
 ## Pushing to GitHub
 
 From **`ListMyNest`** (this folder):

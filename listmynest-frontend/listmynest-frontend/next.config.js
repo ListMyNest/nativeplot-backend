@@ -25,9 +25,30 @@ function imageRemotePatterns() {
   return patterns;
 }
 
+const withBundleAnalyzer = require("@next/bundle-analyzer")({
+  enabled: process.env.ANALYZE === "true",
+});
+
 const nextConfig = {
   // Fix Windows/OneDrive EPERM on `.next/trace` by disabling file tracing.
   outputFileTracing: false,
+  /** Baseline security headers for production deployments (complement TLS at CDN/reverse proxy). */
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+        ],
+      },
+    ];
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
@@ -41,8 +62,13 @@ const nextConfig = {
         source: "/mock-upload/:path*",
         destination: `${origin}/mock-upload/:path*`,
       },
+      // Same-origin `/v1/*` when NEXT_PUBLIC_API_BASE_URL is unset (see lib/api.ts) — hits Spring on `origin`.
+      {
+        source: "/v1/:path*",
+        destination: `${origin}/v1/:path*`,
+      },
     ];
   },
 };
 
-module.exports = nextConfig;
+module.exports = withBundleAnalyzer(nextConfig);

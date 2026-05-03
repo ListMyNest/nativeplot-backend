@@ -105,7 +105,17 @@ export default function AdminPropertyDetailPage() {
           </div>
 
           {!p ? (
-            <div className="mt-6 h-28 animate-pulse rounded-2xl bg-white" />
+            <div className="mt-6 space-y-3" aria-hidden>
+              <div className="h-8 w-[min(60%,240px)] rounded-lg bg-[#D4C4B4]/90 animate-pulse" />
+              <div className="h-28 rounded-2xl border border-[#D2C6BC] bg-[#EDE4DC] p-4 shadow-inner">
+                <div className="h-4 w-[min(80%,320px)] rounded-md bg-[#C9B8A8] animate-pulse" />
+                <div className="mt-3 h-3 w-[min(50%,200px)] rounded bg-[#BFB0A0] animate-pulse" />
+                <div className="mt-6 flex gap-2">
+                  <div className="h-9 w-24 rounded-lg bg-[#B5A696] animate-pulse" />
+                  <div className="h-9 w-28 rounded-lg bg-[#B5A696] animate-pulse" />
+                </div>
+              </div>
+            </div>
           ) : (
             <>
               <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm">

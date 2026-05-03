@@ -34,3 +34,6 @@ Thumbs.db
 
 # Optional local notes
 *.pem
+
+# Accidental local copy — do not commit
+listmynest-frontend__placeholder_backup/

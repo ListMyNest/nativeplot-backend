@@ -14,6 +14,7 @@ import com.listmynest.dto.CreateSellerRequest;
 import com.listmynest.dto.PageResponse;
 import com.listmynest.dto.UpdateAgentRequest;
 import com.listmynest.dto.UpdatePropertyStatusRequest;
+import com.listmynest.dto.UpdateVisitStatusRequest;
 import com.listmynest.dto.VisitDTO;
 import com.listmynest.exception.AppException;
 import com.listmynest.service.AdminService;
@@ -21,6 +22,10 @@ import com.listmynest.service.VisitService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -118,12 +124,40 @@ public class AdminController {
         return adminService.getAllBuyers(page, size);
     }
 
+    /**
+     * Excel-friendly UTF-8 CSV (BOM) of visits whose {@code visitDate} falls in the range inclusive.
+     * Primary path is {@code /export/visits} (no ambiguity with {@code /visits}). Legacy {@code /visits/export} kept for bookmarks.
+     */
+    @GetMapping(value = {"/export/visits", "/visits/export"})
+    public ResponseEntity<byte[]> exportVisits(
+            @RequestParam LocalDate dateFrom,
+            @RequestParam LocalDate dateTo
+    ) {
+        byte[] body = visitService.exportVisitsCsv(dateFrom, dateTo);
+        String filename = VisitService.visitsExportFilename(dateFrom, dateTo);
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(filename, StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .body(body);
+    }
+
     @GetMapping("/visits")
     public PageResponse<VisitDTO> visits(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "30") int size
     ) {
         return visitService.listVisitsForAdmin(page, size);
+    }
+
+    @PatchMapping("/visits/{id}/status")
+    public VisitDTO adminPatchVisitStatus(
+            @PathVariable("id") UUID visitId,
+            @Valid @RequestBody UpdateVisitStatusRequest body
+    ) {
+        return visitService.updateVisitStatusAsAdmin(visitId, body.status(), body.notes());
     }
 
     @GetMapping("/audit-log")

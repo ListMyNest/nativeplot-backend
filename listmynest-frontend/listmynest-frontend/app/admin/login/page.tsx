@@ -97,7 +97,7 @@ export default function AdminLoginPage() {
 
   return (
     <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-lmn-card px-4 py-10">
-      <div className="w-full max-w-md rounded-2xl border border-lmn-border bg-white p-6 shadow-lg">
+      <div className="w-full max-w-md rounded-2xl border-2 border-lmn-border bg-white p-6 shadow-lg">
         <Link
           href="/"
           className="mb-6 inline-flex min-h-[48px] items-center gap-2 text-sm font-semibold text-lmn-primary"

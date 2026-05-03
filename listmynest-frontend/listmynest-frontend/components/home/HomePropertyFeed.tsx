@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   getApiErrorMessage,
@@ -15,6 +15,7 @@ import { useFilterStore } from "../../store/filterStore";
 import type { PropertyListItem } from "../../types";
 import { showToast } from "../../lib/toast";
 import { PropertyCard } from "../property/PropertyCard";
+import { PropertyCardSkeleton } from "../ui/LoadingSkeleton";
 
 function PropertyCardTracked({ property }: { property: PropertyListItem }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -55,30 +56,6 @@ function PropertyCardTracked({ property }: { property: PropertyListItem }) {
   );
 }
 
-function SkeletonGrid() {
-  return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {[1, 2, 3, 4, 5, 6].map((k) => (
-        <div
-          key={k}
-          className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
-        >
-          <div className="aspect-video animate-pulse bg-gray-200" />
-          <div className="space-y-2 p-3">
-            <div className="h-4 w-24 animate-pulse rounded bg-gray-200" />
-            <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
-            <div className="h-3 w-48 max-w-[70%] animate-pulse rounded bg-gray-200" />
-            <div className="mt-2 flex gap-2">
-              <div className="h-6 w-14 animate-pulse rounded-full bg-gray-200" />
-              <div className="h-6 w-14 animate-pulse rounded-full bg-gray-200" />
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = useState(value);
   useEffect(() => {
@@ -93,6 +70,7 @@ export function HomePropertyFeed() {
   const propertyType = useFilterStore((s) => s.propertyType);
   const searchQuery = useFilterStore((s) => s.searchQuery);
   const debouncedSearch = useDebounced(searchQuery.trim(), 320);
+  const [showLoading, setShowLoading] = useState(false);
 
   const query = useQuery({
     queryKey: ["homePropertyFeed", city, propertyType, debouncedSearch],
@@ -128,23 +106,36 @@ export function HomePropertyFeed() {
   }, [query.isError, query.error]);
 
   const items = query.data ?? [];
-  const loading = query.isLoading;
-  const empty = useMemo(
-    () => !loading && (items.length === 0 || query.isError),
-    [items.length, loading, query.isError]
-  );
+  const empty = items.length === 0 || query.isError;
+
+  useEffect(() => {
+    // Show skeleton whenever we're fetching AND there's no data yet.
+    // Keep it visible briefly so users can perceive it on slow networks.
+    const fetching = query.fetchStatus === "fetching";
+    if (fetching && (!query.data || query.data.length === 0)) {
+      setShowLoading(true);
+      return;
+    }
+    if (!fetching) {
+      const t = window.setTimeout(() => setShowLoading(false), 250);
+      return () => window.clearTimeout(t);
+    }
+  }, [query.fetchStatus, query.data]);
+
+  if (query.isLoading || showLoading) {
+    return <PropertyCardSkeleton count={6} />;
+  }
 
   return (
     <>
-      {loading ? <SkeletonGrid /> : null}
-      {!loading && empty ? (
-        <p className="rounded-2xl border border-dashed border-lmn-border bg-lmn-card px-4 py-10 text-center text-sm leading-relaxed text-lmn-muted">
+      {empty ? (
+        <p className="rounded-2xl border-2 border-dashed border-border bg-surface px-4 py-10 text-center text-sm leading-relaxed text-muted shadow-md">
           {query.isError
             ? "We could not reach the server to load listings. Confirm the backend is running and NEXT_PUBLIC_API_BASE_URL is correct."
             : "No properties yet. Check back soon!"}
         </p>
       ) : null}
-      {!loading && !empty ? (
+      {!empty ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((property) => (
             <PropertyCardTracked key={property.id} property={property} />

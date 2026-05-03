@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -40,6 +41,16 @@ public class VisitService {
 
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
     private static final DateTimeFormatter ISO_INSTANT = DateTimeFormatter.ISO_INSTANT;
+
+    /** UTF-8 CSV header — snake_case; visit fields use {@code visit_*} prefix. */
+    private static final String VISITS_CSV_HEADER =
+            "visit_id,property_id,property_title,property_city,buyer_phone,"
+                    + "visit_date,visit_time,visit_status,visit_notes,agent_name,agent_phone,created_at\n";
+
+    /** Download filename aligned with the browser fallback in {@code adminDownloadVisitsCsv}. */
+    public static String visitsExportFilename(LocalDate dateFrom, LocalDate dateTo) {
+        return "listmynest_visits_" + dateFrom + "_to_" + dateTo + ".csv";
+    }
 
     private final VisitRepository visitRepository;
     private final PropertyRepository propertyRepository;
@@ -121,7 +132,15 @@ public class VisitService {
     }
 
     private boolean isSchedulable(Property property) {
-        return property.getStatus() == PropertyStatus.ACTIVE;
+        if (property.getStatus() == PropertyStatus.ACTIVE) {
+            return true;
+        }
+        // Local/dev: allow scheduling against non-active fixtures (see VisitServiceScheduleVisitTest).
+        if (property.getStatus() == PropertyStatus.PENDING_REVIEW
+                && Arrays.asList(environment.getActiveProfiles()).contains("local")) {
+            return true;
+        }
+        return false;
     }
 
     @Transactional(readOnly = true)
@@ -140,6 +159,73 @@ public class VisitService {
                 PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "createdAt")));
         List<VisitDTO> content = result.getContent().stream().map(this::toDto).toList();
         return new PageResponse<>(content, result.getNumber(), result.getSize(), result.getTotalElements());
+    }
+
+    /**
+     * UTF-8 CSV with BOM for Excel. Rows filtered by {@code visitDate} inclusive.
+     */
+    @Transactional(readOnly = true)
+    public byte[] exportVisitsCsv(LocalDate dateFrom, LocalDate dateTo) {
+        if (dateTo.isBefore(dateFrom)) {
+            throw new AppException(400, "INVALID_DATE_RANGE");
+        }
+        long spanDays = ChronoUnit.DAYS.between(dateFrom, dateTo);
+        if (spanDays > 366) {
+            throw new AppException(400, "DATE_RANGE_TOO_LARGE");
+        }
+        List<Visit> rows = visitRepository.findAllForExportBetween(dateFrom, dateTo);
+        DateTimeFormatter localDate = DateTimeFormatter.ISO_LOCAL_DATE;
+        StringBuilder sb = new StringBuilder(512 + Math.max(16, rows.size()) * 160);
+        sb.append(VISITS_CSV_HEADER);
+        for (Visit v : rows) {
+            Property p = v.getProperty();
+            String agentName = "";
+            String agentPhone = "";
+            if (v.getAgent() != null) {
+                agentName = v.getAgent().getName() != null ? v.getAgent().getName() : "";
+                agentPhone = v.getAgent().getPhone() != null ? v.getAgent().getPhone() : "";
+            }
+            Instant created = v.getCreatedAt() != null ? v.getCreatedAt() : Instant.now();
+            sb.append(csvCell(uuidCell(v.getId())))
+                    .append(',')
+                    .append(csvCell(p != null ? uuidCell(p.getId()) : ""))
+                    .append(',')
+                    .append(csvCell(p != null ? p.getTitle() : ""))
+                    .append(',')
+                    .append(csvCell(p != null ? p.getCity() : ""))
+                    .append(',')
+                    .append(csvCell(v.getBuyerPhone()))
+                    .append(',')
+                    .append(csvCell(v.getVisitDate().format(localDate)))
+                    .append(',')
+                    .append(csvCell(v.getVisitTime().toString()))
+                    .append(',')
+                    .append(csvCell(v.getStatus().name()))
+                    .append(',')
+                    .append(csvCell(v.getNotes()))
+                    .append(',')
+                    .append(csvCell(agentName))
+                    .append(',')
+                    .append(csvCell(agentPhone))
+                    .append(',')
+                    .append(csvCell(ISO_INSTANT.format(created.truncatedTo(ChronoUnit.SECONDS))))
+                    .append('\n');
+        }
+        return ("\uFEFF" + sb).getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static String uuidCell(UUID id) {
+        return id == null ? "" : id.toString().toLowerCase();
+    }
+
+    private static String csvCell(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String s = raw.replace("\r\n", "\n").replace('\r', '\n');
+        boolean needsQuotes = s.contains(",") || s.contains("\"") || s.contains("\n");
+        s = s.replace("\"", "\"\"");
+        return needsQuotes ? "\"" + s + "\"" : s;
     }
 
     @Transactional(readOnly = true)
@@ -180,7 +266,30 @@ public class VisitService {
         if (visit.getAgent() == null || !visit.getAgent().getId().equals(agentId)) {
             throw new AppException(403, "FORBIDDEN");
         }
+        return applyVisitStatusChange(visit, newStatus, notes, agentId, false);
+    }
 
+    /**
+     * Admin override — no agent ownership check. When {@code notes} is null, existing notes are kept.
+     */
+    @Transactional
+    public VisitDTO updateVisitStatusAsAdmin(UUID visitId, String newStatus, String notes) {
+        Visit visit = visitRepository.findById(visitId)
+                .orElseThrow(() -> new AppException(404, "VISIT_NOT_FOUND"));
+        return applyVisitStatusChange(visit, newStatus, notes, null, true);
+    }
+
+    /**
+     * @param preserveNotesIfNull when true, do not change {@link Visit#getNotes()} if {@code notes} is null
+     */
+    private VisitDTO applyVisitStatusChange(
+            Visit visit,
+            String newStatus,
+            String notes,
+            UUID agentIdForLog,
+            boolean preserveNotesIfNull
+    ) {
+        VisitStatus previous = visit.getStatus();
         VisitStatus status;
         try {
             status = VisitStatus.valueOf(newStatus.trim().toUpperCase());
@@ -189,7 +298,13 @@ public class VisitService {
         }
 
         visit.setStatus(status);
-        visit.setNotes(notes);
+        if (!preserveNotesIfNull || notes != null) {
+            visit.setNotes(notes);
+        }
+
+        if (previous == VisitStatus.VISITED && status != VisitStatus.VISITED) {
+            visit.setPostVisitWaSent(false);
+        }
 
         if (status == VisitStatus.VISITED && !Boolean.TRUE.equals(visit.getPostVisitWaSent())) {
             whatsAppService.sendPostVisitTemplate(
@@ -211,10 +326,10 @@ public class VisitService {
         propertyRepository.save(property);
 
         log.info(
-                "VISIT_STATUS_UPDATED id={} status={} agent={}",
+                "VISIT_STATUS_UPDATED id={} status={} actor={}",
                 visit.getId(),
                 status.name(),
-                agentId
+                agentIdForLog != null ? agentIdForLog.toString() : "ADMIN"
         );
 
         return toDto(visit);
